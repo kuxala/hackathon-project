@@ -1,5 +1,7 @@
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
+// AI parser disabled - imports commented out
+// import { analyzeFileStructure, categorizeTransactionsBatch, type AIAnalysisResult, type RawDataRow } from './aiFileParser'
 
 export interface ParsedTransaction {
   date: string
@@ -9,6 +11,7 @@ export interface ParsedTransaction {
   balance?: number
   category?: string
   merchant?: string
+  categoryConfidence?: number
 }
 
 export interface ParseResult {
@@ -28,26 +31,32 @@ interface CSVRow {
 }
 
 /**
- * Parse CSV file (browser-side)
+ * Parse CSV file (browser-side) with AI-powered analysis
  */
 export async function parseCSV(file: File): Promise<ParseResult> {
   return new Promise((resolve) => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: async (results) => {
         try {
           const csvData = results.data as CSVRow[]
-          const transactions = processCSVData(csvData)
+
+          // Use AI-powered processing
+          const transactions = await processCSVData(csvData, file.name)
           const stats = calculateStats(transactions)
+
+          // Use rule-based bank detection (AI disabled)
           const bankInfo = detectBank(csvData, file.name)
+          const detectedBank = bankInfo.bank
+          const accountNumber = bankInfo.accountNumber
 
           resolve({
             success: true,
             transactions,
             ...stats,
-            detectedBank: bankInfo.bank,
-            accountNumber: bankInfo.accountNumber
+            detectedBank,
+            accountNumber
           })
         } catch (error) {
           resolve({
@@ -73,14 +82,13 @@ export async function parseCSV(file: File): Promise<ParseResult> {
 }
 
 /**
- * Parse Excel file (browser-side)
+ * Parse Excel file (browser-side) with AI-powered analysis
  */
 export async function parseExcel(file: File): Promise<ParseResult> {
   try {
     const arrayBuffer = await file.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: 'array' })
 
-    console.log(`📄 Excel file has ${workbook.SheetNames.length} sheets:`, workbook.SheetNames)
 
     // Try ALL sheets and find the one with most transaction-like data
     let bestTransactions: ParsedTransaction[] = []
@@ -92,29 +100,29 @@ export async function parseExcel(file: File): Promise<ParseResult> {
       const worksheet = workbook.Sheets[sheetName]
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as CSVRow[]
 
-      console.log(`📋 Sheet "${sheetName}": ${jsonData.length} rows`)
 
       // Skip empty sheets
       if (jsonData.length === 0) continue
 
       // Log first row to see structure
       if (jsonData.length > 0) {
-        console.log(`🔍 First row from "${sheetName}":`, jsonData[0])
       }
 
-      const transactions = processCSVData(jsonData)
-      console.log(`💰 Sheet "${sheetName}" extracted ${transactions.length} transactions`)
+      // Use AI-powered processing
+      const transactions = await processCSVData(jsonData, file.name)
 
       // Use the sheet with the most valid transactions
       if (transactions.length > bestTransactions.length) {
         bestTransactions = transactions
         bestStats = calculateStats(transactions)
+
+        // Use rule-based bank detection (AI disabled)
         bestBankInfo = detectBank(jsonData, file.name)
+
         bestSheetName = sheetName
       }
     }
 
-    console.log(`✅ Best sheet: "${bestSheetName}" with ${bestTransactions.length} transactions`)
 
     // If no transactions found in any sheet, return error
     if (bestTransactions.length === 0) {
@@ -291,32 +299,187 @@ function analyzeColumns(data: CSVRow[]): {
 }
 
 /**
- * Process CSV/Excel data into transactions
+ * Process CSV/Excel data into transactions using AI-powered analysis
  */
-function processCSVData(data: CSVRow[]): ParsedTransaction[] {
+async function processCSVData(data: CSVRow[], fileName?: string): Promise<ParsedTransaction[]> {
   if (data.length === 0) return []
 
-  // Analyze column types intelligently (language-agnostic)
+  // AI parser disabled - using rule-based parsing only
+  return processCSVDataFallback(data)
+
+  /* AI PARSER DISABLED - UNCOMMENT TO RE-ENABLE
+  try {
+    // Use AI to analyze file structure and detect columns
+    const aiAnalysis = await analyzeFileStructure(data as RawDataRow[], fileName)
+
+    const columns = aiAnalysis.columnMapping
+
+    // If AI returned nothing useful, use fallback immediately
+    if (!columns || Object.keys(columns).length === 0) {
+      return processCSVDataFallback(data)
+    }
+
+    const transactions: ParsedTransaction[] = []
+
+    // Process each row using AI-detected column mappings
+    for (const row of data) {
+      try {
+        // Get date using AI-detected column
+        let dateStr = columns.date ? row[columns.date] : undefined
+        if (!dateStr) {
+          // Fallback: search for date in any column
+          const allValues = Object.values(row)
+          dateStr = allValues.find(v => looksLikeDate(String(v)))
+        }
+        if (!dateStr) continue // Skip if no date found
+
+        // Get description using AI-detected column
+        let description = columns.description ? row[columns.description] : undefined
+        if (!description) {
+          // Fallback: search for text description
+          const allValues = Object.entries(row)
+          const textEntry = allValues.find(([key, v]) =>
+            key !== columns.date && looksLikeText(String(v))
+          )
+          description = textEntry ? textEntry[1] : 'Transaction'
+        }
+        description = String(description || 'Transaction').trim()
+
+        // Parse amount using AI-detected columns
+        let amount = 0
+        let type: 'debit' | 'credit' = 'debit'
+
+        if (columns.debit && columns.credit) {
+          // Separate debit/credit columns
+          const debitStr = row[columns.debit]
+          const creditStr = row[columns.credit]
+
+          if (debitStr && parseFloat(String(debitStr).replace(/[^0-9.-]/g, '')) !== 0) {
+            amount = Math.abs(parseFloat(String(debitStr).replace(/[^0-9.-]/g, '')))
+            type = 'debit'
+          } else if (creditStr && parseFloat(String(creditStr).replace(/[^0-9.-]/g, '')) !== 0) {
+            amount = Math.abs(parseFloat(String(creditStr).replace(/[^0-9.-]/g, '')))
+            type = 'credit'
+          }
+        } else if (columns.amount) {
+          // Single amount column
+          const amountStr = row[columns.amount]
+          const parsedAmount = parseFloat(String(amountStr).replace(/[^0-9.-]/g, ''))
+          amount = Math.abs(parsedAmount)
+          type = parsedAmount < 0 ? 'debit' : 'credit'
+        } else if (columns.type) {
+          // Has explicit type column - try to find amount
+          const allValues = Object.entries(row)
+          const amountEntry = allValues.find(([key, v]) =>
+            key !== columns.date && key !== columns.description && looksLikeAmount(String(v))
+          )
+          if (amountEntry) {
+            amount = Math.abs(parseFloat(String(amountEntry[1]).replace(/[^0-9.-]/g, '')))
+            const typeStr = String(row[columns.type]).toLowerCase()
+            type = typeStr.includes('credit') || typeStr.includes('deposit') ? 'credit' : 'debit'
+          }
+        } else {
+          // Fallback: search for any amount column
+          const allValues = Object.entries(row)
+          const amountEntry = allValues.find(([key, v]) =>
+            key !== columns.date && key !== columns.description && looksLikeAmount(String(v))
+          )
+          if (amountEntry) {
+            const parsedAmount = parseFloat(String(amountEntry[1]).replace(/[^0-9.-]/g, ''))
+            amount = Math.abs(parsedAmount)
+            type = parsedAmount < 0 ? 'debit' : 'credit'
+          }
+        }
+
+        // Skip if no valid amount
+        if (amount === 0 || isNaN(amount)) continue
+
+        // Parse balance if available
+        let balance: number | undefined
+        if (columns.balance && row[columns.balance]) {
+          const balanceStr = String(row[columns.balance]).replace(/[^0-9.-]/g, '')
+          balance = parseFloat(balanceStr)
+          if (isNaN(balance)) balance = undefined
+        }
+
+        // Use AI-detected merchant or extract from description
+        const merchant = columns.merchant ? String(row[columns.merchant]) : extractMerchant(description)
+
+        // Use AI-detected category if available
+        const category = columns.category ? String(row[columns.category]) : undefined
+
+        transactions.push({
+          date: normalizeDate(String(dateStr)),
+          description,
+          amount,
+          type,
+          balance,
+          merchant,
+          category
+        })
+      } catch (error) {
+        // Skip invalid rows silently
+        continue
+      }
+    }
+
+    // If no categories detected, use AI to categorize all transactions
+    if (transactions.length > 0 && !columns.category) {
+      try {
+        const categorizationResults = await categorizeTransactionsBatch(
+          transactions.map(t => ({
+            description: t.description,
+            amount: t.amount,
+            merchant: t.merchant
+          }))
+        )
+
+        // Apply categorization results
+        transactions.forEach((tx, idx) => {
+          if (categorizationResults[idx]) {
+            tx.category = categorizationResults[idx].category
+            tx.categoryConfidence = categorizationResults[idx].confidence
+            // Update merchant if AI provided a better one
+            if (categorizationResults[idx].merchant) {
+              tx.merchant = categorizationResults[idx].merchant
+            }
+          }
+        })
+      } catch (error) {
+      }
+    }
+
+    return transactions
+
+  } catch (error) {
+    console.error('❌ AI analysis failed, falling back to rule-based parsing:', error)
+    // Fallback to old method if AI fails
+    return processCSVDataFallback(data)
+  }
+  */
+}
+
+/**
+ * Fallback: Original rule-based processing (kept for reliability)
+ */
+function processCSVDataFallback(data: CSVRow[]): ParsedTransaction[] {
+  if (data.length === 0) return []
+
   const columns = analyzeColumns(data)
-  console.log('🔬 Detected columns:', columns)
 
   const transactions: ParsedTransaction[] = []
 
   for (const row of data) {
     try {
-      // Get date - try detected column first, then search all columns
       let dateStr = columns.date ? row[columns.date] : undefined
       if (!dateStr) {
-        // Search for date in any column
         const allValues = Object.values(row)
         dateStr = allValues.find(v => looksLikeDate(String(v)))
       }
-      if (!dateStr) continue // Skip if no date found
+      if (!dateStr) continue
 
-      // Get description - try detected column first, then search for text
       let description = columns.description ? row[columns.description] : undefined
       if (!description) {
-        // Search for text description in any column
         const allValues = Object.entries(row)
         const textEntry = allValues.find(([key, v]) =>
           key !== columns.date && looksLikeText(String(v))
@@ -325,12 +488,10 @@ function processCSVData(data: CSVRow[]): ParsedTransaction[] {
       }
       description = String(description || 'Transaction').trim()
 
-      // Parse amount - handle different formats
       let amount = 0
       let type: 'debit' | 'credit' = 'debit'
 
       if (columns.debit && columns.credit) {
-        // Separate debit/credit columns
         const debitStr = row[columns.debit]
         const creditStr = row[columns.credit]
 
@@ -342,13 +503,11 @@ function processCSVData(data: CSVRow[]): ParsedTransaction[] {
           type = 'credit'
         }
       } else if (columns.amount) {
-        // Single amount column
         const amountStr = row[columns.amount]
         const parsedAmount = parseFloat(String(amountStr).replace(/[^0-9.-]/g, ''))
         amount = Math.abs(parsedAmount)
         type = parsedAmount < 0 ? 'debit' : 'credit'
       } else {
-        // No amount column detected - search for any number that looks like money
         const allValues = Object.entries(row)
         const amountEntry = allValues.find(([key, v]) =>
           key !== columns.date && key !== columns.description && looksLikeAmount(String(v))
@@ -360,10 +519,8 @@ function processCSVData(data: CSVRow[]): ParsedTransaction[] {
         }
       }
 
-      // Skip if no valid amount
       if (amount === 0 || isNaN(amount)) continue
 
-      // Parse balance if available
       let balance: number | undefined
       if (columns.balance && row[columns.balance]) {
         const balanceStr = String(row[columns.balance]).replace(/[^0-9.-]/g, '')
@@ -371,7 +528,6 @@ function processCSVData(data: CSVRow[]): ParsedTransaction[] {
         if (isNaN(balance)) balance = undefined
       }
 
-      // Extract merchant from description
       const merchant = extractMerchant(description)
 
       transactions.push({
@@ -383,8 +539,6 @@ function processCSVData(data: CSVRow[]): ParsedTransaction[] {
         merchant
       })
     } catch (error) {
-      // Skip invalid rows silently
-      console.warn('Skipping row:', error)
       continue
     }
   }

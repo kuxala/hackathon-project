@@ -15,17 +15,9 @@ export default function DashboardPage() {
     }
   }, [user, loading, router])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-sm text-foreground/60">Loading...</div>
-      </div>
-    )
-  }
-
   if (!user) {
     return null
   }
 
-  return <DashboardExample user={user} onSignOut={signOut} />
+  return <DashboardExample user={user} onSignOut={signOut} loading={loading} />
 }

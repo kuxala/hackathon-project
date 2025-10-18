@@ -38,11 +38,9 @@ export function SpendingIncomeChart({ value, percentageChange, isInView, data }:
       }
     }
 
-    console.log('📊 Chart data:', { income: data.income, spending: data.spending })
     const incomePath = convertToSmoothPath(data.income, 472, 150)
     const spendingPath = convertToSmoothPath(data.spending, 472, 150)
     const surplusPath = createAreaPath(incomePath, 472, 150)
-    console.log('📈 Generated paths:', { incomePath: incomePath.substring(0, 100), spendingPath: spendingPath.substring(0, 100) })
 
     return { incomePath, spendingPath, surplusPath }
   }, [data])

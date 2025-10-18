@@ -75,23 +75,10 @@ export async function POST(request: Request) {
         const parsed = JSON.parse(parsedData)
         detectedBank = parsed.detectedBank || 'Unknown Bank'
         accountNumber = parsed.accountNumber
-        parsedTransactions = parsed.transactions || []
-
-        console.log('📊 PARSED DATA:', {
-          detectedBank,
-          accountNumber,
-          transactionCount: parsedTransactions.length,
-          periodStart: parsed.periodStart,
-          periodEnd: parsed.periodEnd,
-          totalCredits: parsed.totalCredits,
-          totalDebits: parsed.totalDebits,
-          firstTransaction: parsedTransactions[0],
-        })
-      } catch (e) {
+        parsedTransactions = parsed.transactions || []      } catch (e) {
         console.error('❌ Failed to parse data:', e)
       }
     } else {
-      console.warn('⚠️ No parsed data provided')
     }
 
     // Generate unique file path (no account needed)
@@ -124,9 +111,8 @@ export async function POST(request: Request) {
 
     // Store transactions directly (simplified - no accounts/statements tables needed)
     if (parsedTransactions.length > 0) {
-      console.log(`💾 Attempting to insert ${parsedTransactions.length} transactions`)
 
-      // Insert transactions with bank metadata
+      // Insert transactions with bank metadata and AI categorization
       const transactionsToInsert = parsedTransactions.map((tx: any) => ({
         user_id: user.id,
         bank_name: detectedBank,
@@ -137,17 +123,16 @@ export async function POST(request: Request) {
         amount: tx.amount,
         transaction_type: tx.type,
         balance: tx.balance,
+        category: tx.category, // AI-generated category
+        category_confidence: tx.categoryConfidence, // AI confidence score
         file_url: publicUrl,
         file_name: file.name
       }))
 
-      console.log('🔍 First transaction to insert:', transactionsToInsert[0])
-      console.log('👤 User ID:', user.id)
 
       // Insert in batches of 100
       for (let i = 0; i < transactionsToInsert.length; i += 100) {
         const batch = transactionsToInsert.slice(i, i + 100)
-        console.log(`📤 Inserting batch ${Math.floor(i/100) + 1} (${batch.length} transactions)`)
 
         const { error: insertError, data: insertData } = await supabase
           .from('transactions')
@@ -168,12 +153,19 @@ export async function POST(request: Request) {
           )
         }
 
-        console.log(`✅ Successfully inserted batch ${Math.floor(i/100) + 1}:`, insertData?.length || 0, 'records')
       }
 
-      console.log(`✅ All ${parsedTransactions.length} transactions inserted successfully`)
+      // Generate insights asynchronously (fire and forget for performance)
+      fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/insights`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ time_period: '90d' })
+      }).catch(err => console.error('Background insights generation failed:', err))
+
     } else {
-      console.warn('⚠️ No transactions found in file - file uploaded but no data extracted')
     }
 
     // Parse preview data for response

@@ -16,6 +16,9 @@ export interface ChatCompletionRequest {
 }
 
 export async function createChatCompletion(request: ChatCompletionRequest) {
+
+
+
   if (!OPENROUTER_API_KEY) {
     throw new Error('OPENROUTER_API_KEY is not configured')
   }
@@ -41,11 +44,15 @@ export async function createChatCompletion(request: ChatCompletionRequest) {
 
 // Helper function for simple chat
 export async function chat(userMessage: string, conversationHistory: ChatMessage[] = []) {
+  // Check if conversation history already has a system message
+  const hasSystemMessage = conversationHistory.some(msg => msg.role === 'system')
+
   const messages: ChatMessage[] = [
-    {
-      role: 'system',
+    // Only add default system message if one doesn't exist
+    ...(hasSystemMessage ? [] : [{
+      role: 'system' as const,
       content: 'You are a helpful AI assistant. Be concise and friendly.'
-    },
+    }]),
     ...conversationHistory,
     {
       role: 'user',
@@ -58,6 +65,32 @@ export async function chat(userMessage: string, conversationHistory: ChatMessage
     messages,
     temperature: 0.7,
     max_tokens: 1000
+  })
+
+  return response.choices[0].message.content
+}
+
+// Helper function for structured data analysis using Gemini
+export async function analyzeWithGemini(
+  systemPrompt: string,
+  userPrompt: string,
+  temperature: number = 0.1,
+  maxTokens: number = 2000
+) {
+  const response = await createChatCompletion({
+    model: 'google/gemini-2.0-flash-exp:free', // Free Google Gemini model - great for structured analysis
+    messages: [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      {
+        role: 'user',
+        content: userPrompt
+      }
+    ],
+    temperature,
+    max_tokens: maxTokens
   })
 
   return response.choices[0].message.content

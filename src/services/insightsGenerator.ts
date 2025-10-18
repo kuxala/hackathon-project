@@ -32,13 +32,6 @@ export async function generateInsights(
   // Calculate basic statistics
   const stats = calculateStatistics(transactions)
 
-  console.log('📈 Statistics:', {
-    totalTransactions: transactions.length,
-    totalDebits: stats.totalDebits,
-    totalCredits: stats.totalCredits,
-    categories: Object.keys(stats.byCategory).length
-  })
-
   // 1. Spending Pattern Analysis
   const spendingPatterns = await analyzeSpendingPatterns(stats, userId)
   insights.push(...spendingPatterns)
@@ -127,10 +120,12 @@ async function analyzeSpendingPatterns(
   stats: ReturnType<typeof calculateStatistics>,
   userId: string
 ): Promise<Partial<AIInsight>[]> {
+  // AI disabled for performance - using rule-based insights only
   const topCategories = Object.entries(stats.byCategory)
     .sort((a, b) => b[1].total - a[1].total)
     .slice(0, 5)
 
+  /* AI DISABLED FOR PERFORMANCE
   const prompt = `You are a financial analyst AI. Analyze spending data and generate insights with chart-ready data.
 
 TRANSACTION DATA:
@@ -189,6 +184,8 @@ IMPORTANT RULES:
 6. Return ONLY valid JSON, no markdown formatting, no code blocks, no explanations
 7. Make sure all numbers are rounded to 2 decimal places`
 
+  // AI DISABLED - Skip to fallback
+  /*
   try {
     const response = await sendMessage(prompt, 'insights-bot', [])
     const jsonMatch = response.message.match(/\[[\s\S]*\]/)
@@ -209,8 +206,9 @@ IMPORTANT RULES:
   } catch (error) {
     console.error('AI spending pattern analysis error:', error)
   }
+  */
 
-  // Fallback insight with basic chart data
+  // Rule-based insight with chart data (no AI for performance)
   const fallbackChartData = {
     monthlyTrend: {
       months: stats.monthlyData.map(m => m.month),

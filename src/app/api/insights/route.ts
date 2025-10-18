@@ -11,6 +11,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
  */
 export async function POST(request: Request) {
   try {
+
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json<GenerateInsightsResponse>(
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
       )
     }
 
+
     const body: GenerateInsightsRequest = await request.json()
 
     // Build transaction query (simplified - no user_accounts table)
@@ -38,6 +40,7 @@ export async function POST(request: Request) {
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
+
 
     // Apply time period filter
     if (body.time_period) {
@@ -64,12 +67,13 @@ export async function POST(request: Request) {
     const { data: transactions, error: txError } = await query
 
     if (txError) {
-      console.error('Fetch transactions error:', txError)
+      console.error('❌ Fetch transactions error:', txError)
       return NextResponse.json<GenerateInsightsResponse>(
         { success: false, insights: [], error: txError.message },
         { status: 500 }
       )
     }
+
 
     if (!transactions || transactions.length === 0) {
       return NextResponse.json<GenerateInsightsResponse>(
@@ -91,7 +95,6 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log(`📊 Generating insights for ${transactions.length} transactions`)
 
     // Generate insights (no account_id needed)
     const generatedInsights = await generateInsights(
@@ -99,7 +102,6 @@ export async function POST(request: Request) {
       user.id
     )
 
-    console.log(`✅ Generated ${generatedInsights.length} insights`)
 
     // Store insights in database (no account_id in simplified schema)
     const insightsToInsert = generatedInsights.map(insight => ({
@@ -113,13 +115,14 @@ export async function POST(request: Request) {
       is_dismissed: false
     }))
 
+
     const { data: storedInsights, error: insertError } = await supabase
       .from('ai_insights')
       .insert(insightsToInsert)
       .select()
 
     if (insertError) {
-      console.error('Insert insights error:', insertError)
+      console.error('❌ Insert insights error:', insertError)
       // Return generated insights even if storage fails
       return NextResponse.json<GenerateInsightsResponse>({
         success: true,
@@ -130,6 +133,7 @@ export async function POST(request: Request) {
         })) as any
       })
     }
+
 
     return NextResponse.json<GenerateInsightsResponse>({
       success: true,
@@ -150,6 +154,7 @@ export async function POST(request: Request) {
  */
 export async function GET(request: Request) {
   try {
+
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json<GenerateInsightsResponse>(
@@ -170,9 +175,11 @@ export async function GET(request: Request) {
       )
     }
 
+
     const { searchParams } = new URL(request.url)
     const unreadOnly = searchParams.get('unread_only') === 'true'
     const limit = parseInt(searchParams.get('limit') || '20')
+
 
     let query = supabase
       .from('ai_insights')
@@ -189,12 +196,13 @@ export async function GET(request: Request) {
     const { data: insights, error } = await query
 
     if (error) {
-      console.error('Fetch insights error:', error)
+      console.error('❌ Fetch insights error:', error)
       return NextResponse.json<GenerateInsightsResponse>(
         { success: false, insights: [], error: error.message },
         { status: 500 }
       )
     }
+
 
     return NextResponse.json<GenerateInsightsResponse>({
       success: true,

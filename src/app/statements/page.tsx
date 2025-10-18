@@ -4,7 +4,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { DashboardHeader } from '../dashboard/components/DashboardHeader'
+import { FileUploadWidget } from '@/components/dashboard/FileUploadWidget'
 import { supabase } from '@/lib/supabase'
+import { LoadingState } from '@/components/shared/LoadingState'
 
 interface Transaction {
   id: string
@@ -55,9 +57,19 @@ export default function StatementsPage() {
   const fetchTransactions = async () => {
     try {
       setIsLoading(true)
+
+      // Get current user
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (!currentUser) {
+        setStatements([])
+        setIsLoading(false)
+        return
+      }
+
       const { data, error: fetchError } = await supabase
         .from('transactions')
         .select('*')
+        .eq('user_id', currentUser.id) // Filter by current user
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
@@ -193,9 +205,12 @@ export default function StatementsPage() {
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[rgb(10,10,10)]">
-        <div className="text-sm text-gray-400">Loading...</div>
-      </div>
+      <LoadingState
+        fullscreen
+        className="bg-[rgb(10,10,10)]"
+        label="Fetching your statements"
+        description="We’re compiling your uploaded files and recent transactions."
+      />
     )
   }
 
@@ -206,11 +221,13 @@ export default function StatementsPage() {
       <DashboardHeader user={user} onSignOut={signOut} />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 md:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-50">My Statements</h1>
-          <p className="mt-1 text-base text-gray-400">
-            View and manage your uploaded transactions
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-50">My Statements</h1>
+            <p className="mt-1 text-base text-gray-400">
+              View and manage your uploaded transactions
+            </p>
+          </div>
         </div>
 
         {error && (
@@ -219,14 +236,38 @@ export default function StatementsPage() {
           </div>
         )}
 
+        {/* Upload Widget - Always show at top */}
+        <div className="mb-8">
+          <div className="bg-[rgb(15,15,15)] border border-[rgb(30,30,30)] rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-100 mb-4">Upload New Statement</h2>
+            <FileUploadWidget onUploadComplete={fetchTransactions} />
+          </div>
+        </div>
+
         <div className="space-y-4">
           {statements.length === 0 ? (
             <div className="bg-[rgb(15,15,15)] border border-[rgb(30,30,30)] rounded-lg p-12 text-center">
-              <p className="text-gray-400">No statements found</p>
-              <p className="text-sm text-gray-500 mt-2">Upload a file to get started</p>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-16 w-16 mx-auto text-gray-600 mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-lg font-medium text-gray-300 mb-2">No statements yet</p>
+              <p className="text-sm text-gray-500">Upload your first bank statement or transaction file above to get started</p>
             </div>
           ) : (
-            statements.map(statement => (
+            <>
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold text-gray-100">Your Statements</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  {statements.reduce((sum, s) => sum + s.count, 0)} total transactions across {statements.length} statement{statements.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              {statements.map(statement => (
               <div key={statement.fileName} className="bg-[rgb(15,15,15)] border border-[rgb(30,30,30)] rounded-lg overflow-hidden">
                 {/* Statement Header */}
                 <div
@@ -419,12 +460,9 @@ export default function StatementsPage() {
                   </div>
                 )}
               </div>
-            ))
+            ))}
+            </>
           )}
-        </div>
-
-        <div className="mt-4 text-sm text-gray-400">
-          {statements.reduce((sum, s) => sum + s.count, 0)} total transactions across {statements.length} statement{statements.length !== 1 ? 's' : ''}
         </div>
       </main>
     </div>

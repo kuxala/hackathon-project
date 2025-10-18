@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { LoadingState } from '@/components/shared/LoadingState'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -69,9 +70,12 @@ export default function ChatPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-sm text-foreground/60">Loading...</div>
-      </div>
+      <LoadingState
+        fullscreen
+        className="bg-background"
+        label="Connecting you to chat"
+        description="Authenticating your account and loading recent conversations."
+      />
     )
   }
 

@@ -42,17 +42,13 @@ export function LoanDebtChart({ value, percentageChange, isInView, data }: LoanD
   // Convert data to chart format
   const chartData = useMemo(() => {
     if (!data || !data.categories || data.categories.length === 0) {
-      console.log('⚠️ LoanDebtChart: No data, using defaults')
       return defaultData
     }
 
-    console.log('📊 LoanDebtChart data:', data)
 
     const amounts = data.categories.map(c => c.amount)
-    console.log('💰 Category amounts:', amounts)
 
     const heights = calculateBarPercentages(amounts)
-    console.log('📏 Calculated heights:', heights)
 
     return data.categories.map((cat, idx) => ({
       name: cat.name,

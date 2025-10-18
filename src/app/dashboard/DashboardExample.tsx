@@ -22,6 +22,7 @@ interface DashboardExampleProps {
     email?: string
   }
   onSignOut?: () => void
+  loading?: boolean
 }
 
 interface StoredFileData {
@@ -32,11 +33,12 @@ interface StoredFileData {
   uploadedAt: string
 }
 
-export default function DashboardExample({ user, onSignOut }: DashboardExampleProps) {
+export default function DashboardExample({ user, onSignOut, loading }: DashboardExampleProps) {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [uploadedFileFromLanding, setUploadedFileFromLanding] = useState<StoredFileData | null>(null)
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [isLoadingCharts, setIsLoadingCharts] = useState(false)
+  const [hasTransactions, setHasTransactions] = useState<boolean | null>(null)
   const { ref: chartsRef, isInView } = useInView({ threshold: 0.1, triggerOnce: true })
 
   // Check for pending file from landing page
@@ -76,13 +78,21 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
 
   // Fetch chart data from insights
   const fetchChartData = useCallback(async () => {
-    if (!user?.id) return
+
+    if (!user?.id || loading) {
+      return
+    }
 
     setIsLoadingCharts(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
 
+      if (!session) {
+        setIsLoadingCharts(false)
+        return
+      }
+
+      // Fetch existing insights only (no auto-generation)
       const response = await fetch('/api/insights?limit=20', {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
@@ -91,7 +101,19 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
 
       const result = await response.json()
 
+      // Check if we got insights or if the user has no transactions
       if (result.success && result.insights && result.insights.length > 0) {
+        const noDataInsight = result.insights.find((i: any) => i.id === 'no-data')
+
+        if (noDataInsight) {
+          setHasTransactions(false)
+          setChartData(null)
+          setIsLoadingCharts(false)
+          return
+        }
+
+        setHasTransactions(true)
+
         // Find the spending_pattern insight which has the chartData
         const spendingInsight = result.insights.find(
           (insight: any) => insight.insight_type === 'spending_pattern'
@@ -136,16 +158,23 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
             }
           }
         }
+      } else {
+        setHasTransactions(false)
+        setChartData(null)
       }
     } catch {
+      setHasTransactions(false)
+      setChartData(null)
     } finally {
       setIsLoadingCharts(false)
     }
-  }, [user?.id])
+  }, [user?.id, loading])
 
   useEffect(() => {
     fetchChartData()
   }, [fetchChartData])
+
+  // Log when component renders
   return (
     <div className="flex min-h-screen w-full flex-col relative bg-[rgb(10,10,10)]">
       <DashboardHeader user={user} onSignOut={onSignOut} />
@@ -220,93 +249,188 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
               Import
             </motion.button>
           </motion.div>
-          {!chartData && !isLoadingCharts && (
+          {/* Show empty state if no transactions */}
+          {hasTransactions === false && !isLoadingCharts && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4"
+              className="mb-8 rounded-2xl border border-[rgb(30,30,30)] bg-[rgb(15,15,15)] p-12 text-center"
             >
-              <div className="flex items-center gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <div className="mx-auto max-w-md">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-20 w-20 mx-auto text-gray-600 mb-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-amber-500">Charts showing sample data</p>
-                  <p className="text-xs text-amber-400/80 mt-0.5">
-                    Upload transactions and generate insights to see your real financial data
-                  </p>
-                </div>
+                <h3 className="text-2xl font-bold text-gray-100 mb-3">No Financial Data Yet</h3>
+                <p className="text-base text-gray-400 mb-6">
+                  Upload your bank statements or transaction files to start tracking your finances and get AI-powered insights.
+                </p>
+                <button
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Upload Your First Statement
+                </button>
               </div>
             </motion.div>
           )}
-          <div ref={chartsRef} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              transition={{ delay: 0.1, duration: 0.6 }}
-              className="lg:col-span-3"
-              whileHover={{ y: -2, transition: { duration: 0.2 } }}
-            >
-              <SpendingIncomeChart
-                value={chartData?.monthlyTrend ? Math.max(...chartData.monthlyTrend.income) : 12500}
-                percentageChange={5}
-                isInView={isInView}
-                data={chartData?.monthlyTrend}
-              />
-            </motion.div>
 
-            {/* Show category breakdown OR monthly spending chart */}
-            {chartData?.categoryBreakdown &&
-             chartData.categoryBreakdown.categories.length > 0 &&
-             !(chartData.categoryBreakdown.categories.length === 1 &&
-               chartData.categoryBreakdown.categories[0].name === 'Uncategorized') ? (
+
+          {/* Only show charts if user has transactions */}
+          {hasTransactions !== false && (
+          <>
+            {/* Sample Data Warning Banner */}
+            {!chartData && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 rounded-lg border-2 border-blue-500/30 bg-blue-500/10 p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-400">📊 Sample Data Preview</p>
+                    <p className="text-xs text-blue-300/80 mt-0.5">
+                      The charts below show example data for demonstration. Your insights are being generated automatically.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            <div ref={chartsRef} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-                transition={{ delay: 0.25, duration: 0.6 }}
-                className="lg:col-span-2"
+                transition={{ delay: 0.1, duration: 0.6 }}
+                className="lg:col-span-3 relative"
                 whileHover={{ y: -2, transition: { duration: 0.2 } }}
               >
+                {isLoadingCharts ? (
+                  <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6">
+                    <div className="animate-pulse space-y-4">
+                      <div className="h-4 bg-gray-700 rounded w-1/4"></div>
+                      <div className="h-64 bg-gray-700 rounded"></div>
+                    </div>
+                  </div>
+                ) : !chartData ? (
+                  <div className="relative">
+                    <div className="absolute top-4 right-4 z-10 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 backdrop-blur-sm">
+                      <span className="text-xs font-medium text-blue-400">Sample Data</span>
+                    </div>
+                    <SpendingIncomeChart
+                      value={12500}
+                      percentageChange={5}
+                      isInView={isInView}
+                      data={undefined}
+                    />
+                  </div>
+                ) : (
+                  <SpendingIncomeChart
+                    value={chartData.monthlyTrend ? Math.max(...chartData.monthlyTrend.income) : 12500}
+                    percentageChange={5}
+                    isInView={isInView}
+                    data={chartData.monthlyTrend}
+                  />
+                )}
+              </motion.div>
+
+            {/* Show category breakdown OR monthly spending chart */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+              transition={{ delay: 0.25, duration: 0.6 }}
+              className="lg:col-span-2 relative"
+              whileHover={{ y: -2, transition: { duration: 0.2 } }}
+            >
+              {isLoadingCharts ? (
+                <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6">
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-4 bg-gray-700 rounded w-1/3"></div>
+                    <div className="h-64 bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+              ) : chartData?.categoryBreakdown &&
+                chartData.categoryBreakdown.categories.length > 0 &&
+                !(chartData.categoryBreakdown.categories.length === 1 &&
+                  chartData.categoryBreakdown.categories[0].name === 'Uncategorized') ? (
                 <LoanDebtChart
                   value={chartData.categoryBreakdown.categories.reduce((sum, c) => sum + c.amount, 0)}
                   percentageChange={-2}
                   isInView={isInView}
                   data={chartData.categoryBreakdown}
                 />
-              </motion.div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-                transition={{ delay: 0.25, duration: 0.6 }}
-                className="lg:col-span-2"
-                whileHover={{ y: -2, transition: { duration: 0.2 } }}
-              >
+              ) : !chartData ? (
+                <div className="relative">
+                  <div className="absolute top-4 right-4 z-10 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 backdrop-blur-sm">
+                    <span className="text-xs font-medium text-blue-400">Sample Data</span>
+                  </div>
+                  <MonthlySpendingChart
+                    value={12000}
+                    percentageChange={-2}
+                    isInView={isInView}
+                    data={undefined}
+                  />
+                </div>
+              ) : (
                 <MonthlySpendingChart
-                  value={chartData?.monthlyTrend ? chartData.monthlyTrend.spending.reduce((sum, s) => sum + s, 0) : 12000}
+                  value={chartData.monthlyTrend ? chartData.monthlyTrend.spending.reduce((sum, s) => sum + s, 0) : 12000}
                   percentageChange={-2}
                   isInView={isInView}
-                  data={chartData?.monthlyTrend}
+                  data={chartData.monthlyTrend}
                 />
-              </motion.div>
-            )}
+              )}
+            </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ delay: 0.4, duration: 0.6 }}
-              className="lg:col-span-1"
+              className="lg:col-span-1 relative"
               whileHover={{ y: -2, transition: { duration: 0.2 } }}
             >
-              <BudgetForecastChart
-                value={chartData?.budget?.forecastEndOfMonth || 5000}
-                percentageChange={chartData?.budget ? ((chartData.budget.forecastEndOfMonth - chartData.budget.totalSpent) / chartData.budget.totalSpent * 100) : 10}
-                isInView={isInView}
-                data={chartData?.budget}
-              />
+              {isLoadingCharts ? (
+                <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6">
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-4 bg-gray-700 rounded w-1/2"></div>
+                    <div className="h-64 bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+              ) : !chartData ? (
+                <div className="relative">
+                  <div className="absolute top-4 right-4 z-10 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 backdrop-blur-sm">
+                    <span className="text-xs font-medium text-blue-400">Sample Data</span>
+                  </div>
+                  <BudgetForecastChart
+                    value={5000}
+                    percentageChange={10}
+                    isInView={isInView}
+                    data={undefined}
+                  />
+                </div>
+              ) : (
+                <BudgetForecastChart
+                  value={chartData.budget?.forecastEndOfMonth || 5000}
+                  percentageChange={chartData.budget ? ((chartData.budget.forecastEndOfMonth - chartData.budget.totalSpent) / chartData.budget.totalSpent * 100) : 10}
+                  isInView={isInView}
+                  data={chartData.budget}
+                />
+              )}
             </motion.div>
           </div>
-{/* 
+          </>
+          )}
+{/*
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
@@ -349,7 +473,10 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
           </button>
         </div>
 
-        <FileUploadWidget onUploadComplete={handleCloseModal} />
+        <FileUploadWidget onUploadComplete={() => {
+          handleCloseModal()
+          fetchChartData() // Refresh charts after upload
+        }} />
       </Modal>
     </div>
   );

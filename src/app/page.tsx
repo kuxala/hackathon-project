@@ -8,6 +8,7 @@ import Hero from '@/components/landing/Hero'
 import Features from '@/components/landing/Features'
 import Footer from '@/components/landing/Footer'
 import AnimatedBackground from '@/components/landing/AnimatedBackground'
+import { LoadingState } from '@/components/shared/LoadingState'
 
 export default function Home() {
   const { user, loading } = useAuth()
@@ -21,9 +22,12 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-sm text-foreground/60">Loading...</div>
-      </div>
+      <LoadingState
+        fullscreen
+        className="bg-background"
+        label="Checking your session"
+        description="Hang tight while we prepare your personalized experience."
+      />
     )
   }
 

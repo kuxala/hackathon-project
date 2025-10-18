@@ -224,12 +224,5 @@ export async function learnFromCorrection(
   // 1. Store corrections in a database
   // 2. Build user-specific categorization rules
   // 3. Fine-tune the AI model with user feedback
-
-  console.log('Learning from correction:', {
-    description: transaction.description,
-    aiCategory: 'previous',
-    userCategory
-  })
-
   // Future: Implement learning mechanism
 }
