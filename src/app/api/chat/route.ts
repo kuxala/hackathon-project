@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
-import { chat, type ChatMessage } from '@/lib/openrouter'
+
+import { sendMessage } from '@/services/chatService'
+import type { ChatMessage } from '@/lib/openrouter'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { message, history } = body
+    const { message, history, userId } = body
 
     if (!message) {
       return NextResponse.json(
@@ -13,12 +15,17 @@ export async function POST(request: Request) {
       )
     }
 
-    // Call OpenRouter API with DeepSeek model
-    const response = await chat(message, history as ChatMessage[] || [])
+    // Call chat service to get AI response
+    const response = await sendMessage(
+      message,
+      typeof userId === 'string' && userId.trim() ? userId : 'anonymous',
+      (history ?? []) as ChatMessage[]
+    )
 
     return NextResponse.json({
       success: true,
-      message: response
+      message: response.message,
+      conversationId: response.conversationId
     })
   } catch (error) {
     console.error('Chat API error:', error)

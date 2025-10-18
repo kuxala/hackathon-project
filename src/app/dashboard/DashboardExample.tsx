@@ -9,6 +9,7 @@ import { DashboardHeader } from './components/DashboardHeader'
 
 interface DashboardExampleProps {
   user?: {
+    id?: string
     email?: string
   }
   onSignOut?: () => void
@@ -164,7 +165,7 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
         </div>
       </main>
 
-      <ChatWidget />
+      <ChatWidget userId={user?.id} />
 
       <Modal isOpen={isImportModalOpen} onClose={handleCloseModal}>
         <div className="flex items-start justify-between">
