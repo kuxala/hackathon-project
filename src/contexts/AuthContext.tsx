@@ -9,6 +9,7 @@ type AuthContextType = {
   loading: boolean
   signUp: (email: string, password: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
+  signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -36,19 +37,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/login`
+        emailRedirectTo: `${window.location.origin}/dashboard`
       }
     })
     if (error) throw error
-    return data
   }
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+  }
+
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`
+      }
+    })
     if (error) throw error
   }
 
@@ -58,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   )
