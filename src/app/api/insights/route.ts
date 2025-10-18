@@ -179,6 +179,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const unreadOnly = searchParams.get('unread_only') === 'true'
     const limit = parseInt(searchParams.get('limit') || '20')
+    const insightType = searchParams.get('insight_type')
 
 
     let query = supabase
@@ -191,6 +192,10 @@ export async function GET(request: Request) {
 
     if (unreadOnly) {
       query = query.eq('is_read', false)
+    }
+
+    if (insightType) {
+      query = query.eq('insight_type', insightType)
     }
 
     const { data: insights, error } = await query

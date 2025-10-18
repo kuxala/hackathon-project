@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 
 const NAV_LINKS = [
   { label: 'Overview', href: '/dashboard' },
+  { label: 'AI Insights', href: '/dashboard/insights' },
+  { label: 'Predictions', href: '/dashboard/predictions' },
   { label: 'My Statements', href: '/statements' },
   { label: 'Budget', href: '#' },
-  { label: 'Goals', href: '#' },
-  { label: 'Reports', href: '#' }
+  { label: 'Goals', href: '#' }
 ]
 
 interface DashboardHeaderProps {

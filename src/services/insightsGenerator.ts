@@ -63,8 +63,15 @@ function calculateStatistics(transactions: Transaction[]) {
   const byMonth: { [key: string]: MonthlySpending } = {}
   let totalDebits = 0
   let totalCredits = 0
+  const now = new Date()
 
   transactions.forEach(t => {
+    // Skip future transactions
+    const transactionDate = new Date(t.transaction_date)
+    if (transactionDate > now) {
+      return
+    }
+
     // By category
     const category = t.category || 'Uncategorized'
     if (!byCategory[category]) {

@@ -229,20 +229,26 @@ export async function getSpendingByCategory(
 export async function getMonthlyTrend(
   userId: string,
   authToken: string,
-  months: number = 6
+  months: number = 12
 ) {
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${authToken}` } }
   })
 
+  const now = new Date()
   const startDate = new Date()
   startDate.setMonth(startDate.getMonth() - months)
+
+  // Format dates as YYYY-MM-DD
+  const startDateStr = startDate.toISOString().split('T')[0]
+  const todayStr = now.toISOString().split('T')[0]
 
   const { data: transactions, error } = await supabase
     .from('transactions')
     .select('*')
     .eq('user_id', userId)
-    .gte('transaction_date', startDate.toISOString().split('T')[0])
+    .gte('transaction_date', startDateStr)
+    .lte('transaction_date', todayStr)  // Don't include future dates
     .order('transaction_date', { ascending: true })
 
   if (error) {
@@ -254,8 +260,15 @@ export async function getMonthlyTrend(
     return { months: [], income: [], spending: [] }
   }
 
-  // Group by month
+  // Group by month, filtering out future dates
   const byMonth = transactions.reduce((acc: Record<string, { income: number; spending: number }>, t) => {
+    const transactionDate = new Date(t.transaction_date)
+
+    // Skip future transactions
+    if (transactionDate > now) {
+      return acc
+    }
+
     const month = t.transaction_date.substring(0, 7) // YYYY-MM
     if (!acc[month]) {
       acc[month] = { income: 0, spending: 0 }

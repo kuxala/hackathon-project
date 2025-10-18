@@ -59,40 +59,15 @@ export function convertToSVGPath(
  * Better for visualizing trends
  * Uses smart scaling to handle wide ranges in data
  */
-export function convertToSmoothPath(
-  data: number[],
-  viewBoxWidth: number = 472,
-  viewBoxHeight: number = 150
-): string {
-  if (data.length === 0) return ''
-  if (data.length === 1) return `M0 ${viewBoxHeight / 2}`
+export interface ChartPoint {
+  x: number
+  y: number
+}
 
-  const max = Math.max(...data)
-  const min = Math.min(...data)
-  const range = max - min || 1
+function buildCurveSegments(points: ChartPoint[]): string {
+  if (points.length < 2) return ''
 
-  // If the range is very large and min is close to 0, use sqrt scaling
-  const useLogScale = range > max * 0.8 && min < max * 0.1
-
-  const points = data.map((value, index) => {
-    const x = (index / (data.length - 1)) * viewBoxWidth
-
-    let normalizedValue
-    if (useLogScale && value > 0) {
-      // Use square root scaling for better visual distribution
-      normalizedValue = (Math.sqrt(value) - Math.sqrt(min)) / (Math.sqrt(max) - Math.sqrt(min) || 1)
-    } else {
-      // Linear scaling
-      normalizedValue = (value - min) / range
-    }
-
-    const y = viewBoxHeight - normalizedValue * viewBoxHeight * 0.8 - viewBoxHeight * 0.1
-
-    return { x, y }
-  })
-
-  let path = `M0 ${points[0].y}`
-
+  let segments = ''
   for (let i = 0; i < points.length - 1; i++) {
     const curr = points[i]
     const next = points[i + 1]
@@ -103,10 +78,77 @@ export function convertToSmoothPath(
     const cp2x = next.x - step
     const cp2y = next.y
 
-    path += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${next.x} ${next.y}`
+    segments += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${next.x} ${next.y}`
   }
 
-  return path
+  return segments
+}
+
+export function generateSmoothPath(
+  data: number[],
+  viewBoxWidth: number = 472,
+  viewBoxHeight: number = 150,
+  minValue?: number,
+  maxValue?: number
+): { path: string; points: ChartPoint[] } {
+  if (data.length === 0) return { path: '', points: [] }
+
+  const denominator = Math.max(1, data.length - 1)
+  const computedMax = maxValue ?? Math.max(...data)
+  const computedMin = minValue ?? Math.min(...data)
+  const range = computedMax - computedMin || 1
+  const effectiveMin = Number.isFinite(computedMin) ? computedMin : 0
+  const effectiveMax = Number.isFinite(computedMax) ? computedMax : 1
+
+  // If the range is very large and min is close to 0, use sqrt scaling
+  const useLogScale =
+    range > effectiveMax * 0.8 &&
+    effectiveMin > 0 &&
+    effectiveMin < effectiveMax * 0.1
+
+  const points = data.map((value, index) => {
+    const x = (index / denominator) * viewBoxWidth
+
+    let normalizedValue
+    if (useLogScale && value > 0) {
+      const sqrtMax = Math.sqrt(effectiveMax)
+      const sqrtMin = Math.sqrt(effectiveMin)
+      normalizedValue = (Math.sqrt(value) - sqrtMin) / (sqrtMax - sqrtMin || 1)
+    } else {
+      normalizedValue = (value - effectiveMin) / range
+    }
+
+    const y = viewBoxHeight - normalizedValue * viewBoxHeight * 0.8 - viewBoxHeight * 0.1
+    return { x, y }
+  })
+
+  if (points.length === 1) {
+    const singlePoint = { x: viewBoxWidth / 2, y: points[0].y }
+    return {
+      path: `M${singlePoint.x} ${singlePoint.y}`,
+      points: [singlePoint]
+    }
+  }
+
+  const path = `M${points[0].x} ${points[0].y}${buildCurveSegments(points)}`
+  return { path, points }
+}
+
+export function buildSmoothAreaPath(topPoints: ChartPoint[], bottomPoints: ChartPoint[]): string {
+  if (topPoints.length === 0 || bottomPoints.length === 0) return ''
+  if (topPoints.length === 1 || bottomPoints.length === 1) return ''
+
+  const reversedBottom = [...bottomPoints].reverse()
+
+  const pathParts = [
+    `M${topPoints[0].x} ${topPoints[0].y}`,
+    buildCurveSegments(topPoints),
+    ` L${reversedBottom[0].x} ${reversedBottom[0].y}`,
+    buildCurveSegments(reversedBottom),
+    ' Z'
+  ]
+
+  return pathParts.join('')
 }
 
 /**

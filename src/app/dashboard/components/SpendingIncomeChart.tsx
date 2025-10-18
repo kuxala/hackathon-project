@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState, useMemo } from 'react'
 import { useCountUp } from '@/hooks/useCountUp'
-import { convertToSmoothPath, createAreaPath } from '@/utils/chartHelpers'
+import { buildSmoothAreaPath, generateSmoothPath } from '@/utils/chartHelpers'
 import type { MonthlyTrendData } from '@/types/database'
 
 interface SpendingIncomeChartProps {
@@ -16,7 +16,7 @@ interface SpendingIncomeChartProps {
 export function SpendingIncomeChart({ value, percentageChange, isInView, data }: SpendingIncomeChartProps) {
   const [showIncome, setShowIncome] = useState(true)
   const [showSpending, setShowSpending] = useState(true)
-  const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; income: number; spending: number } | null>(null)
+  const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; income: number; spending: number; clientX: number; clientY: number } | null>(null)
 
   const displayValue = useCountUp({
     end: isInView ? value : 0,
@@ -38,11 +38,27 @@ export function SpendingIncomeChart({ value, percentageChange, isInView, data }:
       }
     }
 
-    const incomePath = convertToSmoothPath(data.income, 472, 150)
-    const spendingPath = convertToSmoothPath(data.spending, 472, 150)
-    const surplusPath = createAreaPath(incomePath, 472, 150)
+    const combinedValues = [...data.income, ...data.spending].filter(value => typeof value === 'number')
+    if (combinedValues.length === 0) {
+      return {
+        incomePath: '',
+        spendingPath: '',
+        surplusPath: ''
+      }
+    }
 
-    return { incomePath, spendingPath, surplusPath }
+    const domainMin = Math.min(...combinedValues)
+    const domainMax = Math.max(...combinedValues)
+
+    const incomeResult = generateSmoothPath(data.income, 472, 150, domainMin, domainMax)
+    const spendingResult = generateSmoothPath(data.spending, 472, 150, domainMin, domainMax)
+    const surplusPath = buildSmoothAreaPath(incomeResult.points, spendingResult.points)
+
+    return {
+      incomePath: incomeResult.path,
+      spendingPath: spendingResult.path,
+      surplusPath
+    }
   }, [data])
 
   // SVG path length for animation
@@ -72,7 +88,7 @@ export function SpendingIncomeChart({ value, percentageChange, isInView, data }:
     const svg = e.currentTarget
     const rect = svg.getBoundingClientRect()
 
-    // Get mouse position relative to SVG element
+    // Get mouse position relative to SVG element (in pixels)
     const clientX = e.clientX - rect.left
     const clientY = e.clientY - rect.top
 
@@ -80,11 +96,25 @@ export function SpendingIncomeChart({ value, percentageChange, isInView, data }:
     const x = (clientX / rect.width) * 472
     const y = (clientY / rect.height) * 150
 
-    // Calculate approximate values based on position
-    const income = Math.round(5000 + (x / 472) * 7500)
-    const spending = Math.round(4000 + (x / 472) * 6000)
+    // Get actual data values based on position
+    let income: number
+    let spending: number
 
-    setHoveredPoint({ x, y, income, spending })
+    if (data?.income && data?.spending && data.income.length > 0) {
+      // Map x position to the closest data point
+      const dataIndex = Math.min(
+        Math.floor((x / 472) * data.income.length),
+        data.income.length - 1
+      )
+      income = data.income[dataIndex]
+      spending = data.spending[dataIndex]
+    } else {
+      // Fallback to approximation for sample data
+      income = Math.round(5000 + (x / 472) * 7500)
+      spending = Math.round(4000 + (x / 472) * 6000)
+    }
+
+    setHoveredPoint({ x, y, income, spending, clientX, clientY })
   }
 
   return (
@@ -149,10 +179,10 @@ export function SpendingIncomeChart({ value, percentageChange, isInView, data }:
         </div>
       </div>
 
-      <div className="relative h-[240px] w-full">
+      <div className="relative h-[280px] w-full">
         <motion.svg
           fill="none"
-          height="100%"
+          height="calc(100% - 30px)"
           preserveAspectRatio="none"
           viewBox="0 0 472 150"
           width="100%"
@@ -258,8 +288,8 @@ export function SpendingIncomeChart({ value, percentageChange, isInView, data }:
           <motion.div
             className="absolute pointer-events-none bg-[rgb(25,25,25)] border border-[rgb(40,40,40)] rounded-lg px-3 py-2 text-xs"
             style={{
-              left: hoveredPoint.x,
-              top: hoveredPoint.y - 80
+              left: hoveredPoint.clientX,
+              top: hoveredPoint.clientY - 80
             }}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -295,6 +325,63 @@ export function SpendingIncomeChart({ value, percentageChange, isInView, data }:
             </div>
           </motion.div>
         )}
+
+        {/* Month labels */}
+        <div className="flex justify-between mt-3 px-1">
+          {data?.months ? (
+            data.months.map((month, index) => {
+              // Format month label (e.g., "2024-10" -> "Oct '24")
+              const date = new Date(month + '-01')
+              const monthLabel = date.toLocaleDateString('en-US', { month: 'short' })
+              const year = date.getFullYear().toString().slice(-2)
+
+              // Show fewer labels if we have many months to avoid crowding
+              const totalMonths = data.months.length
+              let shouldShow = false
+
+              if (totalMonths <= 6) {
+                shouldShow = true // Show all
+              } else if (totalMonths <= 12) {
+                shouldShow = index % 2 === 0 || index === totalMonths - 1 // Show every other
+              } else {
+                shouldShow = index % 3 === 0 || index === totalMonths - 1 // Show every third
+              }
+
+              return (
+                <div key={index} className="flex-1 text-center">
+                  {shouldShow ? (
+                    <span className="text-xs text-gray-500">
+                      {monthLabel} &apos;{year}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-transparent">-</span>
+                  )}
+                </div>
+              )
+            })
+          ) : (
+            // Fallback labels for sample data - last 12 months
+            Array.from({ length: 12 }, (_, i) => {
+              const date = new Date()
+              date.setMonth(date.getMonth() - (11 - i))
+              const monthLabel = date.toLocaleDateString('en-US', { month: 'short' })
+              const year = date.getFullYear().toString().slice(-2)
+              const shouldShow = i % 2 === 0 || i === 11
+
+              return (
+                <div key={i} className="flex-1 text-center">
+                  {shouldShow ? (
+                    <span className="text-xs text-gray-500">
+                      {monthLabel} &apos;{year}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-transparent">-</span>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
       </div>
     </div>
   )

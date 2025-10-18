@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Modal } from '@/components/shared/Modal'
 import { useInView } from '@/hooks/useInView'
@@ -34,6 +35,7 @@ interface StoredFileData {
 }
 
 export default function DashboardExample({ user, onSignOut, loading }: DashboardExampleProps) {
+  const router = useRouter()
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [uploadedFileFromLanding, setUploadedFileFromLanding] = useState<StoredFileData | null>(null)
   const [chartData, setChartData] = useState<ChartData | null>(null)
@@ -204,12 +206,12 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
             </div>
           )}
           <motion.div
-            className="mb-8 flex items-start justify-between"
+            className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <div>
+            <div className="flex-1">
               <motion.h1
                 className="text-3xl font-bold tracking-tight text-gray-50"
                 initial={{ opacity: 0, x: -20 }}
@@ -227,27 +229,72 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
                 Your financial health at a glance
               </motion.p>
             </div>
-            <motion.button
-              onClick={() => setIsImportModalOpen(true)}
-              className="rounded-lg bg-green-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors flex items-center gap-2"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3, duration: 0.4 }}
-              whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(34, 197, 94, 0.4)' }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <motion.svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                whileHover={{ rotate: 180 }}
-                transition={{ duration: 0.3 }}
+            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end">
+              <motion.button
+                onClick={() => router.push('/dashboard/insights')}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-5 py-2.5 text-sm font-medium text-purple-300 transition-all shadow-lg shadow-purple-900/20 hover:border-purple-500/50 hover:bg-purple-500/20 md:w-auto"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+                whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(168, 85, 247, 0.4)' }}
+                whileTap={{ scale: 0.95 }}
               >
-                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </motion.svg>
-              Import
-            </motion.button>
+                <motion.svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                </motion.svg>
+                AI Insights
+              </motion.button>
+              <motion.button
+                onClick={() => router.push('/dashboard/voice')}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-sm font-medium text-emerald-300 transition-all shadow-lg shadow-emerald-900/20 hover:border-emerald-500/50 hover:bg-emerald-500/20 md:w-auto"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.25, duration: 0.4 }}
+                whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(16, 185, 129, 0.4)' }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <motion.svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </motion.svg>
+                Voice Assistant
+              </motion.button>
+              <motion.button
+                onClick={() => setIsImportModalOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700 md:w-auto"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3, duration: 0.4 }}
+                whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(34, 197, 94, 0.4)' }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <motion.svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  whileHover={{ rotate: 180 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </motion.svg>
+                Import
+              </motion.button>
+            </div>
           </motion.div>
           {/* Show empty state if no transactions */}
           {hasTransactions === false && !isLoadingCharts && (

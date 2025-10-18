@@ -105,7 +105,7 @@ export function BudgetForecastChart({ value, percentageChange, isInView, data }:
       </div>
 
       <motion.div
-        className="h-[200px] w-full relative"
+        className="h-[240px] w-full relative"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >

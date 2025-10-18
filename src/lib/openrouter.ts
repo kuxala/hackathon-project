@@ -61,7 +61,7 @@ export async function chat(userMessage: string, conversationHistory: ChatMessage
   ]
 
   const response = await createChatCompletion({
-    model: 'meta-llama/llama-3.2-3b-instruct:free', // Free Llama model
+    model: 'openai/gpt-4.1-nano', // OpenAI GPT-4o Mini (cheaper, faster)
     messages,
     temperature: 0.7,
     max_tokens: 1000

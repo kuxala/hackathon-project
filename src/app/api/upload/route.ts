@@ -69,6 +69,9 @@ export async function POST(request: Request) {
     let detectedBank = 'Unknown Bank'
     let accountNumber: string | undefined
     let parsedTransactions: any[] = []
+    let potentialDuplicates = 0
+    let insertedCount = 0
+    let skippedCount = 0
 
     if (parsedData) {
       try {
@@ -111,6 +114,18 @@ export async function POST(request: Request) {
 
     // Store transactions directly (simplified - no accounts/statements tables needed)
     if (parsedTransactions.length > 0) {
+      // Generate unique upload ID for this batch
+      const uploadId = crypto.randomUUID()
+
+      // Check for potential duplicates
+      const sampleDates = parsedTransactions.slice(0, 5).map((tx: any) => tx.date)
+      const { data: existingTransactions } = await supabase
+        .from('transactions')
+        .select('transaction_date, description, amount')
+        .eq('user_id', user.id)
+        .in('transaction_date', sampleDates)
+
+      potentialDuplicates = existingTransactions?.length || 0
 
       // Insert transactions with bank metadata and AI categorization
       const transactionsToInsert = parsedTransactions.map((tx: any) => ({
@@ -126,17 +141,23 @@ export async function POST(request: Request) {
         category: tx.category, // AI-generated category
         category_confidence: tx.categoryConfidence, // AI confidence score
         file_url: publicUrl,
-        file_name: file.name
+        file_name: file.name,
+        file_upload_id: uploadId
       }))
 
 
-      // Insert in batches of 100
+      // Insert in batches of 100, skip duplicates gracefully
       for (let i = 0; i < transactionsToInsert.length; i += 100) {
         const batch = transactionsToInsert.slice(i, i + 100)
 
-        const { error: insertError, data: insertData } = await supabase
+        // Use upsert with onConflict to skip duplicates
+        // We insert only if the transaction doesn't already exist
+        const { error: insertError, data: insertData, count } = await supabase
           .from('transactions')
-          .insert(batch)
+          .upsert(batch, {
+            onConflict: 'user_id,transaction_date,description,amount,transaction_type',
+            ignoreDuplicates: true // Skip duplicates instead of updating
+          })
           .select()
 
         if (insertError) {
@@ -153,6 +174,8 @@ export async function POST(request: Request) {
           )
         }
 
+        insertedCount += insertData?.length || 0
+        skippedCount += batch.length - (insertData?.length || 0)
       }
 
       // Generate insights asynchronously (fire and forget for performance)
@@ -180,7 +203,9 @@ export async function POST(request: Request) {
           totalCredits: parsed.totalCredits,
           totalDebits: parsed.totalDebits,
           detectedBank,
-          accountNumber
+          accountNumber,
+          stats: parsed.stats, // Include parsing statistics
+          potentialDuplicates
         }
       } catch (e) {
         console.error('Failed to parse preview data:', e)
@@ -190,7 +215,10 @@ export async function POST(request: Request) {
     return NextResponse.json<UploadStatementResponse>({
       success: true,
       statement_id: `${timestamp}`, // Use timestamp as ID
-      preview
+      preview,
+      message: parsedTransactions.length > 0
+        ? `Successfully imported ${insertedCount || parsedTransactions.length} transactions${skippedCount > 0 ? ` (${skippedCount} duplicates skipped)` : ''}`
+        : 'File uploaded but no valid transactions found'
     })
 
   } catch (error) {

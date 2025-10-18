@@ -112,9 +112,9 @@ Respond ONLY with valid JSON in this format:
 }`
 
   try {
-    // Use fastest free model - Llama 3.2 3B is typically faster than Gemini
+    // Use GPT-4o Mini for accurate file structure analysis
     const response = await createChatCompletion({
-      model: 'meta-llama/llama-3.2-3b-instruct:free',
+      model: 'openai/gpt-4o-mini',
       messages: [
         {
           role: 'system',
@@ -205,7 +205,7 @@ Respond with JSON only:
 
   try {
     const response = await createChatCompletion({
-      model: 'meta-llama/llama-3.2-3b-instruct:free',
+      model: 'openai/gpt-4o-mini',
       messages: [
         {
           role: 'system',
@@ -300,7 +300,7 @@ Respond with a JSON array:
 
     try {
       const response = await createChatCompletion({
-        model: 'meta-llama/llama-3.2-3b-instruct:free',
+        model: 'openai/gpt-4o-mini',
         messages: [
           {
             role: 'system',

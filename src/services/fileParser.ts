@@ -1,7 +1,6 @@
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
-// AI parser disabled - imports commented out
-// import { analyzeFileStructure, categorizeTransactionsBatch, type AIAnalysisResult, type RawDataRow } from './aiFileParser'
+import { analyzeFileStructure, categorizeTransactionsBatch, type RawDataRow } from './aiFileParser'
 
 export interface ParsedTransaction {
   date: string
@@ -24,6 +23,12 @@ export interface ParseResult {
   totalDebits: number
   detectedBank?: string
   accountNumber?: string
+  stats?: {
+    totalRows: number
+    importedRows: number
+    skippedRows: number
+    skippedReasons?: Array<{ row: number; reason: string; value?: any }>
+  }
 }
 
 interface CSVRow {
@@ -43,10 +48,10 @@ export async function parseCSV(file: File): Promise<ParseResult> {
           const csvData = results.data as CSVRow[]
 
           // Use AI-powered processing
-          const transactions = await processCSVData(csvData, file.name)
+          const { transactions, skipped } = await processCSVData(csvData, file.name)
           const stats = calculateStats(transactions)
 
-          // Use rule-based bank detection (AI disabled)
+          // Use AI-detected bank info if available, otherwise fallback to rule-based
           const bankInfo = detectBank(csvData, file.name)
           const detectedBank = bankInfo.bank
           const accountNumber = bankInfo.accountNumber
@@ -56,7 +61,13 @@ export async function parseCSV(file: File): Promise<ParseResult> {
             transactions,
             ...stats,
             detectedBank,
-            accountNumber
+            accountNumber,
+            stats: {
+              totalRows: csvData.length,
+              importedRows: transactions.length,
+              skippedRows: skipped.length,
+              skippedReasons: skipped
+            }
           })
         } catch (error) {
           resolve({
@@ -92,13 +103,17 @@ export async function parseExcel(file: File): Promise<ParseResult> {
 
     // Try ALL sheets and find the one with most transaction-like data
     let bestTransactions: ParsedTransaction[] = []
+    let bestSkipped: Array<{ row: number; reason: string; value?: any }> = []
     let bestStats: any = null
     let bestBankInfo: any = null
-    let bestSheetName = ''
+    let bestTotalRows = 0
 
     for (const sheetName of workbook.SheetNames) {
       const worksheet = workbook.Sheets[sheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as CSVRow[]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+        raw: false, // Convert dates to strings
+        dateNF: 'yyyy-mm-dd' // ISO date format
+      }) as CSVRow[]
 
 
       // Skip empty sheets
@@ -109,17 +124,17 @@ export async function parseExcel(file: File): Promise<ParseResult> {
       }
 
       // Use AI-powered processing
-      const transactions = await processCSVData(jsonData, file.name)
+      const { transactions, skipped } = await processCSVData(jsonData, file.name)
 
       // Use the sheet with the most valid transactions
       if (transactions.length > bestTransactions.length) {
         bestTransactions = transactions
+        bestSkipped = skipped
+        bestTotalRows = jsonData.length
         bestStats = calculateStats(transactions)
 
-        // Use rule-based bank detection (AI disabled)
+        // Use AI-detected bank info if available, otherwise fallback to rule-based
         bestBankInfo = detectBank(jsonData, file.name)
-
-        bestSheetName = sheetName
       }
     }
 
@@ -131,7 +146,13 @@ export async function parseExcel(file: File): Promise<ParseResult> {
         transactions: [],
         error: 'No transaction data found in any sheet',
         totalCredits: 0,
-        totalDebits: 0
+        totalDebits: 0,
+        stats: {
+          totalRows: bestTotalRows,
+          importedRows: 0,
+          skippedRows: bestSkipped.length,
+          skippedReasons: bestSkipped
+        }
       }
     }
 
@@ -140,7 +161,13 @@ export async function parseExcel(file: File): Promise<ParseResult> {
       transactions: bestTransactions,
       ...bestStats,
       detectedBank: bestBankInfo.bank,
-      accountNumber: bestBankInfo.accountNumber
+      accountNumber: bestBankInfo.accountNumber,
+      stats: {
+        totalRows: bestTotalRows,
+        importedRows: bestTransactions.length,
+        skippedRows: bestSkipped.length,
+        skippedReasons: bestSkipped
+      }
     }
   } catch (error) {
     return {
@@ -301,13 +328,9 @@ function analyzeColumns(data: CSVRow[]): {
 /**
  * Process CSV/Excel data into transactions using AI-powered analysis
  */
-async function processCSVData(data: CSVRow[], fileName?: string): Promise<ParsedTransaction[]> {
-  if (data.length === 0) return []
+async function processCSVData(data: CSVRow[], fileName?: string): Promise<{ transactions: ParsedTransaction[]; skipped: Array<{ row: number; reason: string; value?: any }> }> {
+  if (data.length === 0) return { transactions: [], skipped: [] }
 
-  // AI parser disabled - using rule-based parsing only
-  return processCSVDataFallback(data)
-
-  /* AI PARSER DISABLED - UNCOMMENT TO RE-ENABLE
   try {
     // Use AI to analyze file structure and detect columns
     const aiAnalysis = await analyzeFileStructure(data as RawDataRow[], fileName)
@@ -320,9 +343,11 @@ async function processCSVData(data: CSVRow[], fileName?: string): Promise<Parsed
     }
 
     const transactions: ParsedTransaction[] = []
+    const skipped: Array<{ row: number; reason: string; value?: any }> = []
 
     // Process each row using AI-detected column mappings
-    for (const row of data) {
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i]
       try {
         // Get date using AI-detected column
         let dateStr = columns.date ? row[columns.date] : undefined
@@ -331,7 +356,10 @@ async function processCSVData(data: CSVRow[], fileName?: string): Promise<Parsed
           const allValues = Object.values(row)
           dateStr = allValues.find(v => looksLikeDate(String(v)))
         }
-        if (!dateStr) continue // Skip if no date found
+        if (!dateStr) {
+          skipped.push({ row: i + 2, reason: 'No date found', value: row })
+          continue // Skip if no date found
+        }
 
         // Get description using AI-detected column
         let description = columns.description ? row[columns.description] : undefined
@@ -392,7 +420,10 @@ async function processCSVData(data: CSVRow[], fileName?: string): Promise<Parsed
         }
 
         // Skip if no valid amount
-        if (amount === 0 || isNaN(amount)) continue
+        if (amount === 0 || isNaN(amount)) {
+          skipped.push({ row: i + 2, reason: 'Invalid or zero amount', value: row })
+          continue
+        }
 
         // Parse balance if available
         let balance: number | undefined
@@ -408,8 +439,14 @@ async function processCSVData(data: CSVRow[], fileName?: string): Promise<Parsed
         // Use AI-detected category if available
         const category = columns.category ? String(row[columns.category]) : undefined
 
+        const normalizedDate = normalizeDate(String(dateStr))
+        if (!normalizedDate) {
+          skipped.push({ row: i + 2, reason: 'Invalid or future date', value: dateStr })
+          continue
+        }
+
         transactions.push({
-          date: normalizeDate(String(dateStr)),
+          date: normalizedDate,
           description,
           amount,
           type,
@@ -418,7 +455,7 @@ async function processCSVData(data: CSVRow[], fileName?: string): Promise<Parsed
           category
         })
       } catch (error) {
-        // Skip invalid rows silently
+        skipped.push({ row: i + 2, reason: 'Parse error', value: error instanceof Error ? error.message : 'Unknown error' })
         continue
       }
     }
@@ -446,37 +483,42 @@ async function processCSVData(data: CSVRow[], fileName?: string): Promise<Parsed
           }
         })
       } catch (error) {
+        console.error('AI categorization failed:', error)
       }
     }
 
-    return transactions
+    return { transactions, skipped }
 
   } catch (error) {
     console.error('❌ AI analysis failed, falling back to rule-based parsing:', error)
     // Fallback to old method if AI fails
     return processCSVDataFallback(data)
   }
-  */
 }
 
 /**
  * Fallback: Original rule-based processing (kept for reliability)
  */
-function processCSVDataFallback(data: CSVRow[]): ParsedTransaction[] {
-  if (data.length === 0) return []
+function processCSVDataFallback(data: CSVRow[]): { transactions: ParsedTransaction[]; skipped: Array<{ row: number; reason: string; value?: any }> } {
+  if (data.length === 0) return { transactions: [], skipped: [] }
 
   const columns = analyzeColumns(data)
 
   const transactions: ParsedTransaction[] = []
+  const skipped: Array<{ row: number; reason: string; value?: any }> = []
 
-  for (const row of data) {
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i]
     try {
       let dateStr = columns.date ? row[columns.date] : undefined
       if (!dateStr) {
         const allValues = Object.values(row)
         dateStr = allValues.find(v => looksLikeDate(String(v)))
       }
-      if (!dateStr) continue
+      if (!dateStr) {
+        skipped.push({ row: i + 2, reason: 'No date found', value: row })
+        continue
+      }
 
       let description = columns.description ? row[columns.description] : undefined
       if (!description) {
@@ -519,7 +561,10 @@ function processCSVDataFallback(data: CSVRow[]): ParsedTransaction[] {
         }
       }
 
-      if (amount === 0 || isNaN(amount)) continue
+      if (amount === 0 || isNaN(amount)) {
+        skipped.push({ row: i + 2, reason: 'Invalid or zero amount', value: row })
+        continue
+      }
 
       let balance: number | undefined
       if (columns.balance && row[columns.balance]) {
@@ -530,8 +575,14 @@ function processCSVDataFallback(data: CSVRow[]): ParsedTransaction[] {
 
       const merchant = extractMerchant(description)
 
+      const normalizedDate = normalizeDate(dateStr)
+      if (!normalizedDate) {
+        skipped.push({ row: i + 2, reason: 'Invalid or future date', value: dateStr })
+        continue
+      }
+
       transactions.push({
-        date: normalizeDate(String(dateStr)),
+        date: normalizedDate,
         description,
         amount,
         type,
@@ -539,34 +590,97 @@ function processCSVDataFallback(data: CSVRow[]): ParsedTransaction[] {
         merchant
       })
     } catch (error) {
+      skipped.push({ row: i + 2, reason: 'Parse error', value: error instanceof Error ? error.message : 'Unknown error' })
       continue
     }
   }
 
-  return transactions
+  return { transactions, skipped }
 }
 
 /**
- * Normalize date to ISO format
+ * Normalize date to ISO format with proper validation
+ * Returns null if date cannot be parsed or is invalid
  */
-function normalizeDate(dateStr: string): string {
+function normalizeDate(dateValue: any): string | null {
   try {
-    // Try parsing various date formats
-    const date = new Date(dateStr)
-    if (isNaN(date.getTime())) {
+    let parsedDate: Date | null = null
+
+    // Handle Excel serial date numbers (e.g., 45230 = 2023-11-01)
+    if (typeof dateValue === 'number') {
+      // Excel dates are days since 1900-01-01 (with 1900 leap year bug)
+      const excelEpoch = new Date(1899, 11, 30) // December 30, 1899
+      parsedDate = new Date(excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000)
+    }
+    // Handle string dates
+    else if (typeof dateValue === 'string') {
+      const dateStr = String(dateValue).trim()
+
+      // Try ISO format first (YYYY-MM-DD) - most reliable
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        parsedDate = new Date(dateStr + 'T00:00:00.000Z')
+      }
       // Try MM/DD/YYYY format
-      const parts = dateStr.split('/')
-      if (parts.length === 3) {
+      else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+        const parts = dateStr.split('/')
         const month = parseInt(parts[0]) - 1
         const day = parseInt(parts[1])
         const year = parseInt(parts[2])
-        return new Date(year, month, day).toISOString().split('T')[0]
+        parsedDate = new Date(year, month, day)
       }
-      throw new Error('Invalid date format')
+      // Try DD-MM-YYYY format
+      else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(dateStr)) {
+        const parts = dateStr.split('-')
+        const day = parseInt(parts[0])
+        const month = parseInt(parts[1]) - 1
+        const year = parseInt(parts[2])
+        parsedDate = new Date(year, month, day)
+      }
+      // Try DD.MM.YYYY format (European)
+      else if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(dateStr)) {
+        const parts = dateStr.split('.')
+        const day = parseInt(parts[0])
+        const month = parseInt(parts[1]) - 1
+        const year = parseInt(parts[2])
+        parsedDate = new Date(year, month, day)
+      }
+      // Fallback to JavaScript Date parser
+      else {
+        parsedDate = new Date(dateStr)
+      }
     }
-    return date.toISOString().split('T')[0]
-  } catch {
-    return new Date().toISOString().split('T')[0] // Fallback to today
+    // Handle Date objects
+    else if (dateValue instanceof Date) {
+      parsedDate = dateValue
+    }
+
+    // Validate parsed date
+    if (!parsedDate || isNaN(parsedDate.getTime())) {
+      return null // Invalid date
+    }
+
+    // Reject future dates
+    const now = new Date()
+    now.setHours(23, 59, 59, 999) // End of today
+    if (parsedDate > now) {
+      console.warn(`Rejecting future date: ${dateValue} → ${parsedDate.toISOString()}`)
+      return null
+    }
+
+    // Reject dates older than 10 years
+    const tenYearsAgo = new Date()
+    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10)
+    tenYearsAgo.setHours(0, 0, 0, 0)
+    if (parsedDate < tenYearsAgo) {
+      console.warn(`Rejecting date older than 10 years: ${dateValue}`)
+      return null
+    }
+
+    // Return ISO format date (YYYY-MM-DD)
+    return parsedDate.toISOString().split('T')[0]
+  } catch (error) {
+    console.error(`Failed to parse date: ${dateValue}`, error)
+    return null
   }
 }
 
