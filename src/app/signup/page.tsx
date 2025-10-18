@@ -58,12 +58,9 @@ export default function SignupPage() {
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-2">
           <h1 className="text-2xl font-light tracking-tight">Create account</h1>
-          <p className="text-sm text-foreground/60">Join us today</p>
         </div>
 
-        <div className="text-xs text-foreground/50 bg-foreground/5 px-3 py-2 rounded border border-border">
-          Note: Use a real email address. Check Supabase settings if you get validation errors.
-        </div>
+   
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
