@@ -41,8 +41,8 @@ export function DashboardHeader({ user, onSignOut }: DashboardHeaderProps) {
           <h2 className="text-xl font-bold text-gray-50">FinSight</h2>
         </div>
         <nav className="hidden items-center gap-6 md:flex">
-          <a className="text-sm font-medium text-gray-300 hover:text-primary" href="#">Overview</a>
-          <a className="text-sm font-medium text-gray-300 hover:text-primary" href="#">Transactions</a>
+          <a className="text-sm font-medium text-gray-300 hover:text-primary" href="/dashboard">Overview</a>
+          <a className="text-sm font-medium text-gray-300 hover:text-primary" href="/statements">My Statements</a>
           <a className="text-sm font-medium text-gray-300 hover:text-primary" href="#">Budget</a>
           <a className="text-sm font-medium text-gray-300 hover:text-primary" href="#">Goals</a>
           <a className="text-sm font-medium text-gray-300 hover:text-primary" href="#">Reports</a>
