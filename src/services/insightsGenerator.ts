@@ -131,31 +131,63 @@ async function analyzeSpendingPatterns(
     .sort((a, b) => b[1].total - a[1].total)
     .slice(0, 5)
 
-  const prompt = `Analyze the following spending data and provide insights:
+  const prompt = `You are a financial analyst AI. Analyze spending data and generate insights with chart-ready data.
 
-Total Monthly Spending: $${stats.averageMonthlySpending.toFixed(2)}
-Total Debits: $${stats.totalDebits.toFixed(2)}
-Total Credits: $${stats.totalCredits.toFixed(2)}
-Net Income: $${stats.netIncome.toFixed(2)}
+TRANSACTION DATA:
+Total Transactions: ${stats.transactionCount}
+Total Spending (Debits): $${stats.totalDebits.toFixed(2)}
+Total Income (Credits): $${stats.totalCredits.toFixed(2)}
+Net Balance: $${stats.netIncome.toFixed(2)}
+Average Monthly Spending: $${stats.averageMonthlySpending.toFixed(2)}
 
-Top Spending Categories:
+TOP SPENDING CATEGORIES:
 ${topCategories.map(([cat, data]) =>
   `- ${cat}: $${data.total.toFixed(2)} (${data.percentage.toFixed(1)}%, ${data.count} transactions)`
 ).join('\n')}
 
-Monthly Breakdown:
+MONTHLY BREAKDOWN:
 ${stats.monthlyData.map(m =>
-  `- ${m.month}: Spent $${m.debits.toFixed(2)}, Earned $${m.credits.toFixed(2)}`
+  `- ${m.month}: Income $${m.credits.toFixed(2)}, Spent $${m.debits.toFixed(2)}`
 ).join('\n')}
 
-Provide 2-3 key spending pattern insights in this JSON format:
+Generate 2-3 financial insights in this EXACT JSON format:
 [
   {
-    "title": "Short insight title",
-    "description": "Detailed description of the pattern",
-    "severity": "info"
+    "title": "Brief insight title (e.g., 'Dining Spending Increased')",
+    "description": "2-3 sentence detailed explanation of the pattern or issue",
+    "severity": "info" | "warning" | "critical",
+    "chartData": {
+      "monthlyTrend": {
+        "months": ["2024-10", "2024-11", ...],
+        "income": [5200, 5400, ...],
+        "spending": [4100, 4500, ...]
+      },
+      "categoryBreakdown": {
+        "categories": [
+          {"name": "Groceries", "amount": 654.21, "percentage": 22.0, "color": "green"},
+          {"name": "Dining", "amount": 847.32, "percentage": 28.5, "color": "rose"},
+          {"name": "Transportation", "amount": 432.15, "percentage": 14.5, "color": "blue"},
+          {"name": "Entertainment", "amount": 298.50, "percentage": 10.0, "color": "purple"}
+        ]
+      },
+      "budget": {
+        "totalBudget": ${(stats.totalCredits * 0.8).toFixed(2)},
+        "totalSpent": ${stats.totalDebits.toFixed(2)},
+        "utilizationPercentage": ${stats.totalCredits > 0 ? ((stats.totalDebits / stats.totalCredits) * 100).toFixed(1) : 0},
+        "forecastEndOfMonth": ${(stats.averageMonthlySpending * 1.1).toFixed(2)}
+      }
+    }
   }
-]`
+]
+
+IMPORTANT RULES:
+1. Use the ACTUAL monthly data provided above to populate "months", "income", and "spending" arrays
+2. Ensure array lengths match (same number of months for income and spending)
+3. Use top 4-6 categories from the data provided
+4. Assign colors: green/emerald for necessities, rose/amber for high spending, blue/purple for discretionary
+5. Calculate realistic budget numbers based on the income/spending data
+6. Return ONLY valid JSON, no markdown formatting, no code blocks, no explanations
+7. Make sure all numbers are rounded to 2 decimal places`
 
   try {
     const response = await sendMessage(prompt, 'insights-bot', [])
@@ -169,7 +201,7 @@ Provide 2-3 key spending pattern insights in this JSON format:
         title: String(insight.title),
         description: String(insight.description),
         severity: (insight.severity as 'info' | 'warning' | 'critical') || 'info',
-        data: { stats, analysis: insight },
+        data: insight.chartData || { stats, analysis: insight },
         is_read: false,
         is_dismissed: false
       }))
@@ -178,14 +210,36 @@ Provide 2-3 key spending pattern insights in this JSON format:
     console.error('AI spending pattern analysis error:', error)
   }
 
-  // Fallback insight
+  // Fallback insight with basic chart data
+  const fallbackChartData = {
+    monthlyTrend: {
+      months: stats.monthlyData.map(m => m.month),
+      income: stats.monthlyData.map(m => m.credits),
+      spending: stats.monthlyData.map(m => m.debits)
+    },
+    categoryBreakdown: {
+      categories: topCategories.slice(0, 4).map(([name, data]) => ({
+        name,
+        amount: data.total,
+        percentage: data.percentage,
+        color: (data.percentage > 25 ? 'rose' : data.percentage > 15 ? 'amber' : 'green') as 'emerald' | 'green' | 'rose' | 'amber' | 'blue' | 'purple'
+      }))
+    },
+    budget: {
+      totalBudget: stats.totalCredits * 0.8,
+      totalSpent: stats.totalDebits,
+      utilizationPercentage: stats.totalCredits > 0 ? (stats.totalDebits / stats.totalCredits) * 100 : 0,
+      forecastEndOfMonth: stats.averageMonthlySpending * 1.1
+    }
+  }
+
   return [{
     user_id: userId,
     insight_type: 'spending_pattern',
     title: 'Spending Analysis Complete',
     description: `You spent $${stats.totalDebits.toFixed(2)} across ${stats.transactionCount} transactions.`,
     severity: 'info',
-    data: stats,
+    data: fallbackChartData,
     is_read: false,
     is_dismissed: false
   }]

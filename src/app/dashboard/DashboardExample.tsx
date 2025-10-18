@@ -8,10 +8,13 @@ import { ChatWidget } from './components/ChatWidget'
 import { DashboardHeader } from './components/DashboardHeader'
 import { SpendingIncomeChart } from './components/SpendingIncomeChart'
 import { LoanDebtChart } from './components/LoanDebtChart'
+import { MonthlySpendingChart } from './components/MonthlySpendingChart'
 import { BudgetForecastChart } from './components/BudgetForecastChart'
 import { FileUploadWidget } from '@/components/dashboard/FileUploadWidget'
 import { TransactionTable } from '@/components/dashboard/TransactionTable'
 import { InsightsPanel } from '@/components/dashboard/InsightsPanel'
+import { supabase } from '@/lib/supabase'
+import type { ChartData } from '@/types/database'
 
 interface DashboardExampleProps {
   user?: {
@@ -32,6 +35,8 @@ interface StoredFileData {
 export default function DashboardExample({ user, onSignOut }: DashboardExampleProps) {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [uploadedFileFromLanding, setUploadedFileFromLanding] = useState<StoredFileData | null>(null)
+  const [chartData, setChartData] = useState<ChartData | null>(null)
+  const [isLoadingCharts, setIsLoadingCharts] = useState(false)
   const { ref: chartsRef, isInView } = useInView({ threshold: 0.1, triggerOnce: true })
 
   // Check for pending file from landing page
@@ -45,10 +50,7 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
         localStorage.removeItem('pendingFinancialFile')
 
         // TODO: Here you would trigger the analysis function when it's ready
-        console.log('File retrieved from landing page:', fileData.name)
-        // Future: analyzeFinancialData(fileData)
-      } catch (error) {
-        console.error('Error parsing pending file:', error)
+      } catch {
         localStorage.removeItem('pendingFinancialFile')
       }
     }
@@ -72,6 +74,78 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
     setIsImportModalOpen(false)
   }, [])
 
+  // Fetch chart data from insights
+  const fetchChartData = useCallback(async () => {
+    if (!user?.id) return
+
+    setIsLoadingCharts(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch('/api/insights?limit=20', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      const result = await response.json()
+
+      if (result.success && result.insights && result.insights.length > 0) {
+        // Find the spending_pattern insight which has the chartData
+        const spendingInsight = result.insights.find(
+          (insight: any) => insight.insight_type === 'spending_pattern'
+        )
+
+        if (spendingInsight) {
+          // Check if it has the new chartData structure
+          if (spendingInsight.data && (
+            spendingInsight.data.monthlyTrend ||
+            spendingInsight.data.categoryBreakdown ||
+            spendingInsight.data.budget
+          )) {
+            setChartData(spendingInsight.data as ChartData)
+          } else {
+            // The AI didn't return the proper format, so use fallback from old stats
+            const oldStats = spendingInsight.data
+            if (oldStats && oldStats.monthlyData) {
+              const fallbackData = {
+                monthlyTrend: {
+                  months: oldStats.monthlyData.map((m: any) => m.month),
+                  income: oldStats.monthlyData.map((m: any) => m.credits),
+                  spending: oldStats.monthlyData.map((m: any) => m.debits)
+                },
+                categoryBreakdown: {
+                  categories: Object.entries(oldStats.byCategory || {})
+                    .slice(0, 4)
+                    .map(([name, data]: [string, any]) => ({
+                      name,
+                      amount: data.total,
+                      percentage: data.percentage,
+                      color: (data.percentage > 25 ? 'rose' : data.percentage > 15 ? 'amber' : 'green') as any
+                    }))
+                },
+                budget: {
+                  totalBudget: oldStats.totalCredits * 0.8,
+                  totalSpent: oldStats.totalDebits,
+                  utilizationPercentage: oldStats.totalCredits > 0 ? (oldStats.totalDebits / oldStats.totalCredits) * 100 : 0,
+                  forecastEndOfMonth: oldStats.averageMonthlySpending * 1.1
+                }
+              }
+              setChartData(fallbackData)
+            }
+          }
+        }
+      }
+    } catch {
+    } finally {
+      setIsLoadingCharts(false)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    fetchChartData()
+  }, [fetchChartData])
   return (
     <div className="flex min-h-screen w-full flex-col relative bg-[rgb(10,10,10)]">
       <DashboardHeader user={user} onSignOut={onSignOut} />
@@ -146,6 +220,25 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
               Import
             </motion.button>
           </motion.div>
+          {!chartData && !isLoadingCharts && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4"
+            >
+              <div className="flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-500">Charts showing sample data</p>
+                  <p className="text-xs text-amber-400/80 mt-0.5">
+                    Upload transactions and generate insights to see your real financial data
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
           <div ref={chartsRef} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -154,17 +247,50 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
               className="lg:col-span-3"
               whileHover={{ y: -2, transition: { duration: 0.2 } }}
             >
-              <SpendingIncomeChart value={12500} percentageChange={5} isInView={isInView} />
+              <SpendingIncomeChart
+                value={chartData?.monthlyTrend ? Math.max(...chartData.monthlyTrend.income) : 12500}
+                percentageChange={5}
+                isInView={isInView}
+                data={chartData?.monthlyTrend}
+              />
             </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              transition={{ delay: 0.25, duration: 0.6 }}
-              className="lg:col-span-2"
-              whileHover={{ y: -2, transition: { duration: 0.2 } }}
-            >
-              <LoanDebtChart value={25000} percentageChange={-2} isInView={isInView} />
-            </motion.div>
+
+            {/* Show category breakdown OR monthly spending chart */}
+            {chartData?.categoryBreakdown &&
+             chartData.categoryBreakdown.categories.length > 0 &&
+             !(chartData.categoryBreakdown.categories.length === 1 &&
+               chartData.categoryBreakdown.categories[0].name === 'Uncategorized') ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                transition={{ delay: 0.25, duration: 0.6 }}
+                className="lg:col-span-2"
+                whileHover={{ y: -2, transition: { duration: 0.2 } }}
+              >
+                <LoanDebtChart
+                  value={chartData.categoryBreakdown.categories.reduce((sum, c) => sum + c.amount, 0)}
+                  percentageChange={-2}
+                  isInView={isInView}
+                  data={chartData.categoryBreakdown}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                transition={{ delay: 0.25, duration: 0.6 }}
+                className="lg:col-span-2"
+                whileHover={{ y: -2, transition: { duration: 0.2 } }}
+              >
+                <MonthlySpendingChart
+                  value={chartData?.monthlyTrend ? chartData.monthlyTrend.spending.reduce((sum, s) => sum + s, 0) : 12000}
+                  percentageChange={-2}
+                  isInView={isInView}
+                  data={chartData?.monthlyTrend}
+                />
+              </motion.div>
+            )}
+
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
@@ -172,11 +298,15 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
               className="lg:col-span-1"
               whileHover={{ y: -2, transition: { duration: 0.2 } }}
             >
-              <BudgetForecastChart value={5000} percentageChange={10} isInView={isInView} />
+              <BudgetForecastChart
+                value={chartData?.budget?.forecastEndOfMonth || 5000}
+                percentageChange={chartData?.budget ? ((chartData.budget.forecastEndOfMonth - chartData.budget.totalSpent) / chartData.budget.totalSpent * 100) : 10}
+                isInView={isInView}
+                data={chartData?.budget}
+              />
             </motion.div>
           </div>
-
-          {/* AI Insights Section */}
+{/* 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
@@ -184,11 +314,11 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
             className="mt-8"
           >
             <h2 className="text-2xl font-bold text-gray-50 mb-4">AI Insights</h2>
-            <InsightsPanel />
-          </motion.div>
+            <InsightsPanel onGenerateInsights={fetchChartData} />
+          </motion.div> */}
 
           {/* Transactions Section */}
-          <motion.div
+          {/* <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
             transition={{ delay: 0.6, duration: 0.6 }}
@@ -196,7 +326,7 @@ export default function DashboardExample({ user, onSignOut }: DashboardExamplePr
           >
             <h2 className="text-2xl font-bold text-gray-50 mb-4">Recent Transactions</h2>
             <TransactionTable />
-          </motion.div>
+          </motion.div> */}
         </div>
       </main>
 

@@ -1,16 +1,19 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useCountUp } from '@/hooks/useCountUp'
+import { convertToSmoothPath, createAreaPath } from '@/utils/chartHelpers'
+import type { MonthlyTrendData } from '@/types/database'
 
 interface SpendingIncomeChartProps {
   value: number
   percentageChange: number
   isInView: boolean
+  data?: MonthlyTrendData
 }
 
-export function SpendingIncomeChart({ value, percentageChange, isInView }: SpendingIncomeChartProps) {
+export function SpendingIncomeChart({ value, percentageChange, isInView, data }: SpendingIncomeChartProps) {
   const [showIncome, setShowIncome] = useState(true)
   const [showSpending, setShowSpending] = useState(true)
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; income: number; spending: number } | null>(null)
@@ -24,8 +27,28 @@ export function SpendingIncomeChart({ value, percentageChange, isInView }: Spend
     suffix: ''
   })
 
+  // Generate SVG paths from real data
+  const { incomePath, spendingPath, surplusPath } = useMemo(() => {
+    if (!data || !data.income || !data.spending) {
+      // Fallback to hardcoded paths
+      return {
+        incomePath: "M0 109 C 18.1538 109 18.1538 21 36.3077 21 C 54.4615 21 54.4615 41 72.6154 41 C 90.7692 41 90.7692 93 108.923 93 C 127.077 93 127.077 33 145.231 33 C 163.385 33 163.385 101 181.538 101 C 199.692 101 199.692 61 217.846 61 C 236 61 236 45 254.154 45 C 272.308 45 272.308 121 290.462 121 C 308.615 121 308.615 149 326.769 149 C 344.923 149 344.923 1 363.077 1 C 381.231 1 381.231 81 399.385 81 C 417.538 81 417.538 129 435.692 129 C 453.846 129 453.846 25 472 25",
+        spendingPath: "M0 130 C 18.1538 130 18.1538 80 36.3077 80 C 54.4615 80 54.4615 100 72.6154 100 C 90.7692 100 90.7692 60 108.923 60 C 127.077 60 127.077 90 145.231 90 C 163.385 90 163.385 50 181.538 50 C 199.692 50 199.692 80 217.846 80 C 236 80 236 110 254.154 110 C 272.308 110 272.308 70 290.462 70 C 308.615 70 308.615 95 326.769 95 C 344.923 95 344.923 65 363.077 65 C 381.231 65 381.231 105 399.385 105 C 417.538 105 417.538 75 435.692 75 C 453.846 75 453.846 115 472 115",
+        surplusPath: "M0 109 C 18.1538 109 18.1538 21 36.3077 21 C 54.4615 21 54.4615 41 72.6154 41 C 90.7692 41 90.7692 93 108.923 93 C 127.077 93 127.077 33 145.231 33 C 163.385 33 163.385 101 181.538 101 C 199.692 101 199.692 61 217.846 61 C 236 61 236 45 254.154 45 C 272.308 45 272.308 121 290.462 121 C 308.615 121 308.615 149 326.769 149 C 344.923 149 344.923 1 363.077 1 C 381.231 1 381.231 81 399.385 81 C 417.538 81 417.538 129 435.692 129 C 453.846 129 453.846 25 472 25 L 472 115 C 453.846 115 453.846 75 435.692 75 C 417.538 75 417.538 105 399.385 105 C 381.231 105 381.231 65 363.077 65 C 344.923 65 344.923 95 326.769 95 C 308.615 95 308.615 70 290.462 70 C 272.308 70 272.308 110 254.154 110 C 236 110 236 80 217.846 80 C 199.692 80 199.692 50 181.538 50 C 163.385 50 163.385 90 145.231 90 C 127.077 90 127.077 60 108.923 60 C 90.7692 60 90.7692 100 72.6154 100 C 54.4615 100 54.4615 80 36.3077 80 C 18.1538 80 18.1538 130 0 130 Z"
+      }
+    }
+
+    console.log('📊 Chart data:', { income: data.income, spending: data.spending })
+    const incomePath = convertToSmoothPath(data.income, 472, 150)
+    const spendingPath = convertToSmoothPath(data.spending, 472, 150)
+    const surplusPath = createAreaPath(incomePath, 472, 150)
+    console.log('📈 Generated paths:', { incomePath: incomePath.substring(0, 100), spendingPath: spendingPath.substring(0, 100) })
+
+    return { incomePath, spendingPath, surplusPath }
+  }, [data])
+
   // SVG path length for animation
-  const pathVariants = {
+  const pathVariants: any = {
     hidden: {
       pathLength: 0,
       opacity: 0
@@ -163,7 +186,7 @@ export function SpendingIncomeChart({ value, percentageChange, isInView }: Spend
             >
               {/* This creates a filled area between the two lines */}
               <path
-                d="M0 109 C 18.1538 109 18.1538 21 36.3077 21 C 54.4615 21 54.4615 41 72.6154 41 C 90.7692 41 90.7692 93 108.923 93 C 127.077 93 127.077 33 145.231 33 C 163.385 33 163.385 101 181.538 101 C 199.692 101 199.692 61 217.846 61 C 236 61 236 45 254.154 45 C 272.308 45 272.308 121 290.462 121 C 308.615 121 308.615 149 326.769 149 C 344.923 149 344.923 1 363.077 1 C 381.231 1 381.231 81 399.385 81 C 417.538 81 417.538 129 435.692 129 C 453.846 129 453.846 25 472 25 L 472 115 C 453.846 115 453.846 75 435.692 75 C 417.538 75 417.538 105 399.385 105 C 381.231 105 381.231 65 363.077 65 C 344.923 65 344.923 95 326.769 95 C 308.615 95 308.615 70 290.462 70 C 272.308 70 272.308 110 254.154 110 C 236 110 236 80 217.846 80 C 199.692 80 199.692 50 181.538 50 C 163.385 50 163.385 90 145.231 90 C 127.077 90 127.077 60 108.923 60 C 90.7692 60 90.7692 100 72.6154 100 C 54.4615 100 54.4615 80 36.3077 80 C 18.1538 80 18.1538 130 0 130 Z"
+                d={surplusPath}
                 fill="url(#surplus-gradient)"
                 opacity="0.6"
               />
@@ -174,7 +197,7 @@ export function SpendingIncomeChart({ value, percentageChange, isInView }: Spend
           <AnimatePresence>
             {showIncome && (
               <motion.path
-                d="M0 109 C 18.1538 109 18.1538 21 36.3077 21 C 54.4615 21 54.4615 41 72.6154 41 C 90.7692 41 90.7692 93 108.923 93 C 127.077 93 127.077 33 145.231 33 C 163.385 33 163.385 101 181.538 101 C 199.692 101 199.692 61 217.846 61 C 236 61 236 45 254.154 45 C 272.308 45 272.308 121 290.462 121 C 308.615 121 308.615 149 326.769 149 C 344.923 149 344.923 1 363.077 1 C 381.231 1 381.231 81 399.385 81 C 417.538 81 417.538 129 435.692 129 C 453.846 129 453.846 25 472 25"
+                d={incomePath}
                 stroke="#12a159"
                 strokeLinecap="round"
                 strokeWidth="3"
@@ -182,6 +205,7 @@ export function SpendingIncomeChart({ value, percentageChange, isInView }: Spend
                 animate={isInView ? "visible" : "hidden"}
                 exit={{ pathLength: 0, opacity: 0 }}
                 custom={0}
+                variants={pathVariants}
                 style={{
                   filter: 'drop-shadow(0 0 6px rgba(18, 161, 89, 0.5))',
                 }}
@@ -194,7 +218,7 @@ export function SpendingIncomeChart({ value, percentageChange, isInView }: Spend
           <AnimatePresence>
             {showSpending && (
               <motion.path
-                d="M0 130 C 18.1538 130 18.1538 80 36.3077 80 C 54.4615 80 54.4615 100 72.6154 100 C 90.7692 100 90.7692 60 108.923 60 C 127.077 60 127.077 90 145.231 90 C 163.385 90 163.385 50 181.538 50 C 199.692 50 199.692 80 217.846 80 C 236 80 236 110 254.154 110 C 272.308 110 272.308 70 290.462 70 C 308.615 70 308.615 95 326.769 95 C 344.923 95 344.923 65 363.077 65 C 381.231 65 381.231 105 399.385 105 C 417.538 105 417.538 75 435.692 75 C 453.846 75 453.846 115 472 115"
+                d={spendingPath}
                 stroke="#a78bfa"
                 strokeLinecap="round"
                 strokeWidth="3"
@@ -202,6 +226,7 @@ export function SpendingIncomeChart({ value, percentageChange, isInView }: Spend
                 animate={isInView ? "visible" : "hidden"}
                 exit={{ pathLength: 0, opacity: 0 }}
                 custom={1}
+                variants={pathVariants}
                 style={{
                   filter: 'drop-shadow(0 0 6px rgba(167, 139, 250, 0.5))',
                 }}

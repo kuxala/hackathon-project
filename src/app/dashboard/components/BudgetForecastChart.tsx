@@ -1,20 +1,32 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useCountUp } from '@/hooks/useCountUp'
+import type { BudgetData } from '@/types/database'
 
 interface BudgetForecastChartProps {
   value: number
   percentageChange: number
   isInView: boolean
+  data?: BudgetData
 }
 
-export function BudgetForecastChart({ value, percentageChange, isInView }: BudgetForecastChartProps) {
+export function BudgetForecastChart({ value, percentageChange, isInView, data }: BudgetForecastChartProps) {
   const [isHovered, setIsHovered] = useState(false)
 
+  // Calculate budget utilization color
+  const budgetColor = useMemo(() => {
+    if (!data) return '#f472b6' // default pink
+
+    const utilization = data.utilizationPercentage
+    if (utilization > 90) return '#ef4444' // red
+    if (utilization > 75) return '#f59e0b' // amber
+    return '#10b981' // green
+  }, [data])
+
   const displayValue = useCountUp({
-    end: isInView ? value : 0,
+    end: isInView ? (data?.forecastEndOfMonth || value) : 0,
     start: 0,
     duration: 1000,
     decimals: 0,
@@ -23,7 +35,7 @@ export function BudgetForecastChart({ value, percentageChange, isInView }: Budge
   })
 
   // Path animation variants
-  const pathVariants = {
+  const pathVariants: any = {
     hidden: {
       pathLength: 0,
       opacity: 0
@@ -46,7 +58,7 @@ export function BudgetForecastChart({ value, percentageChange, isInView }: Budge
   }
 
   // Area fill animation
-  const areaVariants = {
+  const areaVariants: any = {
     hidden: {
       clipPath: 'inset(0 100% 0 0)'
     },
@@ -79,10 +91,10 @@ export function BudgetForecastChart({ value, percentageChange, isInView }: Budge
             animate={isInView ? { opacity: 1 } : { opacity: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
           >
-            Next 6 Months
+            {data ? `${data.utilizationPercentage.toFixed(1)}% of budget used` : 'Next 6 Months'}
           </motion.p>
           <motion.p
-            className="text-sm font-medium text-green-500"
+            className={`text-sm font-medium ${data && data.utilizationPercentage > 90 ? 'text-red-500' : data && data.utilizationPercentage > 75 ? 'text-amber-500' : 'text-green-500'}`}
             initial={{ opacity: 0, scale: 0 }}
             animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0 }}
             transition={{ delay: 1.2, duration: 0.4, type: 'spring', stiffness: 200 }}
@@ -107,8 +119,8 @@ export function BudgetForecastChart({ value, percentageChange, isInView }: Budge
         >
           <defs>
             <linearGradient gradientUnits="userSpaceOnUse" id="paint0_linear_budget" x1="236" x2="236" y1="1" y2="150">
-              <stop stopColor="#f472b6" stopOpacity={isHovered ? "0.5" : "0.3"} />
-              <stop offset="1" stopColor="#f472b6" stopOpacity="0" />
+              <stop stopColor={budgetColor} stopOpacity={isHovered ? "0.5" : "0.3"} />
+              <stop offset="1" stopColor={budgetColor} stopOpacity="0" />
             </linearGradient>
 
             {/* Shimmer gradient */}
@@ -160,15 +172,15 @@ export function BudgetForecastChart({ value, percentageChange, isInView }: Budge
           {/* Stroke line */}
           <motion.path
             d="M0 109 C 18.1538 109 18.1538 21 36.3077 21 C 54.4615 21 54.4615 41 72.6154 41 C 90.7692 41 90.7692 93 108.923 93 C 127.077 93 127.077 33 145.231 33 C 163.385 33 163.385 101 181.538 101 C 199.692 101 199.692 61 217.846 61 C 236 61 236 45 254.154 45 C 272.308 45 272.308 121 290.462 121 C 308.615 121 308.615 149 326.769 149 C 344.923 149 344.923 1 363.077 1 C 381.231 1 381.231 81 399.385 81 C 417.538 81 417.538 129 435.692 129 C 453.846 129 453.846 25 472 25"
-            stroke="#f472b6"
+            stroke={budgetColor}
             strokeLinecap="round"
             strokeWidth={isHovered ? "3.5" : "2.5"}
             initial="hidden"
             animate={isInView ? "visible" : "hidden"}
             variants={pathVariants}
             style={{
-              transition: 'stroke-width 0.3s ease',
-              filter: isHovered ? 'drop-shadow(0 0 6px rgba(244, 114, 182, 0.6))' : 'none'
+              transition: 'stroke-width 0.3s ease, stroke 0.3s ease',
+              filter: isHovered ? `drop-shadow(0 0 6px ${budgetColor}99)` : 'none'
             }}
           />
 
@@ -180,9 +192,9 @@ export function BudgetForecastChart({ value, percentageChange, isInView }: Budge
               transition={{ duration: 0.3, type: 'spring', stiffness: 200 }}
             >
               {/* Peak point */}
-              <circle cx="363.077" cy="1" r="5" fill="#f472b6" stroke="white" strokeWidth="2" />
+              <circle cx="363.077" cy="1" r="5" fill={budgetColor} stroke="white" strokeWidth="2" />
               {/* Valley point */}
-              <circle cx="36.3077" cy="21" r="5" fill="#f472b6" stroke="white" strokeWidth="2" />
+              <circle cx="36.3077" cy="21" r="5" fill={budgetColor} stroke="white" strokeWidth="2" />
             </motion.g>
           )}
         </svg>

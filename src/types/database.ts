@@ -78,6 +78,36 @@ export interface TransactionCategory {
   created_at: string
 }
 
+// Chart Data types for AI Insights
+
+export interface MonthlyTrendData {
+  months: string[]        // ["2024-10", "2024-11", "2024-12", ...]
+  income: number[]        // [5200, 5400, 5300, ...]
+  spending: number[]      // [4100, 4500, 4300, ...]
+}
+
+export interface CategoryBreakdown {
+  categories: Array<{
+    name: string          // "Groceries"
+    amount: number        // 654.21
+    percentage: number    // 22.0
+    color: 'emerald' | 'green' | 'rose' | 'amber' | 'blue' | 'purple'
+  }>
+}
+
+export interface BudgetData {
+  totalBudget: number             // 5000
+  totalSpent: number              // 3847
+  utilizationPercentage: number   // 76.9
+  forecastEndOfMonth: number      // 4200
+}
+
+export interface ChartData {
+  monthlyTrend?: MonthlyTrendData
+  categoryBreakdown?: CategoryBreakdown
+  budget?: BudgetData
+}
+
 // API Request/Response types
 
 export interface CreateAccountRequest {
