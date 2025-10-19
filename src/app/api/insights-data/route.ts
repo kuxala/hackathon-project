@@ -54,6 +54,7 @@ export async function GET(request: Request) {
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select('*')
+      .eq('user_id', user.id)
       .gte('transaction_date', startDate.toISOString().split('T')[0])
       .lte('transaction_date', endDate.toISOString().split('T')[0])
       .order('transaction_date', { ascending: true })
@@ -69,8 +70,24 @@ export async function GET(request: Request) {
     console.log('[Insights API] Found transactions:', transactions?.length || 0)
 
     // Use sample data if insufficient real transactions
-    if (!transactions || transactions.length < 20) {
-      console.log('[Insights API] Insufficient transactions (< 20), using sample data for better visualization')
+    if (!transactions || transactions.length < 10) {
+      console.log('[Insights API] Insufficient transactions (< 10), using sample data for better visualization')
+      const sampleData = generateSampleData()
+      return NextResponse.json<InsightsDataResponse>({
+        success: true,
+        data: sampleData
+      })
+    }
+
+    // Check if data quality is good enough (has categorized transactions)
+    const categorizedCount = transactions.filter(t => t.category && t.category !== 'Uncategorized' && t.category !== '').length
+    const categorizationRate = categorizedCount / transactions.length
+
+    console.log('[Insights API] Categorized:', categorizedCount, '/', transactions.length, '=', (categorizationRate * 100).toFixed(0), '%')
+
+    // If less than 30% categorized, use sample data
+    if (categorizationRate < 0.3) {
+      console.log('[Insights API] Low categorization rate (', (categorizationRate * 100).toFixed(0), '%), using sample data')
       const sampleData = generateSampleData()
       return NextResponse.json<InsightsDataResponse>({
         success: true,
@@ -83,19 +100,6 @@ export async function GET(request: Request) {
     const heatmapData = generateHeatmapData(transactions)
     const riverData = generateRiverData(transactions)
     const healthData = generateHealthData(transactions)
-
-    // Check if data quality is good enough (has categorized transactions)
-    const categorizedCount = transactions.filter(t => t.category && t.category !== 'Uncategorized').length
-    const categorizationRate = categorizedCount / transactions.length
-
-    if (categorizationRate < 0.5) {
-      console.log('[Insights API] Low categorization rate (', (categorizationRate * 100).toFixed(0), '%), using sample data')
-      const sampleData = generateSampleData()
-      return NextResponse.json<InsightsDataResponse>({
-        success: true,
-        data: sampleData
-      })
-    }
 
     return NextResponse.json<InsightsDataResponse>({
       success: true,

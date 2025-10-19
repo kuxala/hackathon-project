@@ -2,14 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useVoiceModal } from '@/contexts/VoiceModalContext'
 
 const NAV_LINKS = [
   { label: 'Overview', href: '/dashboard' },
   { label: 'AI Insights', href: '/dashboard/insights' },
   { label: 'Predictions', href: '/dashboard/predictions' },
   { label: 'My Statements', href: '/statements' },
-  { label: 'Budget', href: '#' },
-  { label: 'Goals', href: '#' }
 ]
 
 interface DashboardHeaderProps {
@@ -24,6 +23,7 @@ export function DashboardHeader({ user, onSignOut }: DashboardHeaderProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement>(null)
+  const { isModalOpen } = useVoiceModal()
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -53,6 +53,10 @@ export function DashboardHeader({ user, onSignOut }: DashboardHeaderProps) {
       document.body.style.overflow = ''
     }
   }, [isMobileMenuOpen])
+
+  if (isModalOpen) {
+    return null
+  }
 
   return (
     <header className="sticky top-0 z-[90] border-b border-[rgb(30,30,30)] bg-[rgb(10,10,10)] px-4 py-3 sm:px-6 md:bg-[rgb(10,10,10)]/80 md:px-8 md:backdrop-blur-sm">

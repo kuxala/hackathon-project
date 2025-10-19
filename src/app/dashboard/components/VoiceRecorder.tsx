@@ -168,7 +168,6 @@ export function VoiceRecorder({ onRecordingComplete, onError, disabled }: VoiceR
         }
 
         recognitionRef.current.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error)
 
           // Ignore 'no-speech' error - just end gracefully
           if (event.error === 'no-speech') {

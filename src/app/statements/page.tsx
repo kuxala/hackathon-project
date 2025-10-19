@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { DashboardHeader } from '../dashboard/components/DashboardHeader'
 import { FileUploadWidget } from '@/components/dashboard/FileUploadWidget'
+import { CategorizationModal } from '@/components/dashboard/CategorizationModal'
 import { supabase } from '@/lib/supabase'
 import { LoadingState } from '@/components/shared/LoadingState'
 
@@ -41,6 +42,10 @@ export default function StatementsPage() {
   const [error, setError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Transaction>>({})
+  const [isCategorizing, setIsCategorizing] = useState(false)
+  const [showCategorizationModal, setShowCategorizationModal] = useState(false)
+  const [transactionsToCateg, setTransactionsToCateg] = useState<Transaction[]>([])
+  const [categorizationMessage, setCategorizationMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -203,6 +208,125 @@ export default function StatementsPage() {
     setEditForm({})
   }
 
+  const handleCategorizeStatement = async (fileName: string) => {
+    setIsCategorizing(true)
+    setError(null)
+    setCategorizationMessage(null)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No session')
+
+      const response = await fetch('/api/categorize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ fileName })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Categorization failed')
+      }
+
+      // If manual categorization is needed, show modal
+      if (result.needsManualCategorization && result.transactions?.length > 0) {
+        setTransactionsToCateg(result.transactions)
+        setShowCategorizationModal(true)
+        if (result.message) {
+          setCategorizationMessage(result.message)
+        }
+      } else {
+        // Success - refresh transactions
+        setCategorizationMessage(result.message || 'Categorization complete')
+        await fetchTransactions()
+      }
+    } catch (err) {
+      console.error('Categorization error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to categorize transactions')
+    } finally {
+      setIsCategorizing(false)
+    }
+  }
+
+  const handleCategorizeAll = async () => {
+    setIsCategorizing(true)
+    setError(null)
+    setCategorizationMessage(null)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No session')
+
+      const response = await fetch('/api/categorize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({})
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Categorization failed')
+      }
+
+      // If manual categorization is needed, show modal
+      if (result.needsManualCategorization && result.transactions?.length > 0) {
+        setTransactionsToCateg(result.transactions)
+        setShowCategorizationModal(true)
+        if (result.message) {
+          setCategorizationMessage(result.message)
+        }
+      } else {
+        // Success - refresh transactions
+        setCategorizationMessage(result.message || 'Categorization complete')
+        await fetchTransactions()
+      }
+    } catch (err) {
+      console.error('Categorization error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to categorize transactions')
+    } finally {
+      setIsCategorizing(false)
+    }
+  }
+
+  const handleSaveCategorizations = async (categorizations: { [id: string]: string }) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No session')
+
+      const response = await fetch('/api/categorize', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ categorizations })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save categorizations')
+      }
+
+      setCategorizationMessage(result.message || 'Categories saved successfully')
+      setShowCategorizationModal(false)
+      setTransactionsToCateg([])
+      await fetchTransactions()
+    } catch (err) {
+      console.error('Save categorization error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to save categorizations')
+      throw err
+    }
+  }
+
   if (loading || isLoading) {
     return (
       <LoadingState
@@ -228,11 +352,27 @@ export default function StatementsPage() {
               View and manage your uploaded transactions
             </p>
           </div>
+          <button
+            onClick={handleCategorizeAll}
+            disabled={isCategorizing || statements.length === 0}
+            className="px-6 py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+            {isCategorizing ? 'Categorizing...' : 'Categorize All'}
+          </button>
         </div>
 
         {error && (
           <div className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
             <p className="text-sm text-red-400">{error}</p>
+          </div>
+        )}
+
+        {categorizationMessage && (
+          <div className="mb-6 rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+            <p className="text-sm text-green-400">{categorizationMessage}</p>
           </div>
         )}
 
@@ -306,6 +446,16 @@ export default function StatementsPage() {
                           -{statement.totalDebits.toFixed(2)}
                         </p>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCategorizeStatement(statement.fileName)
+                        }}
+                        disabled={isCategorizing}
+                        className="ml-4 text-blue-400 hover:text-blue-300 text-sm disabled:text-gray-500 disabled:cursor-not-allowed"
+                      >
+                        Categorize
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
@@ -465,6 +615,17 @@ export default function StatementsPage() {
           )}
         </div>
       </main>
+
+      {/* Categorization Modal */}
+      <CategorizationModal
+        isOpen={showCategorizationModal}
+        transactions={transactionsToCateg}
+        onClose={() => {
+          setShowCategorizationModal(false)
+          setTransactionsToCateg([])
+        }}
+        onSave={handleSaveCategorizations}
+      />
     </div>
   )
 }

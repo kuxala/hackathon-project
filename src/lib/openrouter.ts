@@ -78,7 +78,7 @@ export async function analyzeWithGemini(
   maxTokens: number = 2000
 ) {
   const response = await createChatCompletion({
-    model: 'google/gemini-2.0-flash-exp:free', // Free Google Gemini model - great for structured analysis
+    model: 'openai/gpt-5-mini', 
     messages: [
       {
         role: 'system',

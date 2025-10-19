@@ -1,20 +1,25 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { categorizeTransactionsBatch } from '@/services/aiCategorization'
-import type { CategorizeTransactionsRequest, CategorizeTransactionsResponse } from '@/types/database'
+import { categorizeTransactionsBatch } from '@/services/aiFileParser'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+interface CategorizeRequest {
+  transactionIds?: string[]
+  fileName?: string
+}
+
 /**
- * POST /api/categorize - Categorize transactions using AI
+ * POST /api/categorize - Categorize uncategorized transactions using AI
+ * Returns transactions that need manual categorization if AI confidence is low
  */
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
-      return NextResponse.json<CategorizeTransactionsResponse>(
-        { success: false, categorized: [], error: 'Unauthorized' },
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
         { status: 401 }
       )
     }
@@ -25,86 +30,217 @@ export async function POST(request: Request) {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return NextResponse.json<CategorizeTransactionsResponse>(
-        { success: false, categorized: [], error: 'Invalid authentication' },
+      return NextResponse.json(
+        { success: false, error: 'Invalid authentication' },
         { status: 401 }
       )
     }
 
-    const body: CategorizeTransactionsRequest = await request.json()
+    const body: CategorizeRequest = await request.json()
 
-    if (!body.transactions || !Array.isArray(body.transactions) || body.transactions.length === 0) {
-      return NextResponse.json<CategorizeTransactionsResponse>(
-        { success: false, categorized: [], error: 'transactions array is required and must not be empty' },
-        { status: 400 }
+    // Build query for uncategorized transactions
+    let query = supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .or('category.is.null,category.eq.')
+
+    // Filter by specific transaction IDs if provided
+    if (body.transactionIds && body.transactionIds.length > 0) {
+      query = query.in('id', body.transactionIds)
+    }
+
+    // Filter by file name if provided
+    if (body.fileName) {
+      query = query.eq('file_name', body.fileName)
+    }
+
+    const { data: transactions, error: fetchError } = await query
+
+    if (fetchError) {
+      console.error('Error fetching transactions:', fetchError)
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch transactions' },
+        { status: 500 }
       )
     }
 
-    // Limit batch size
-    if (body.transactions.length > 100) {
-      return NextResponse.json<CategorizeTransactionsResponse>(
-        { success: false, categorized: [], error: 'Maximum 100 transactions per request' },
-        { status: 400 }
-      )
+    if (!transactions || transactions.length === 0) {
+      return NextResponse.json({
+        success: true,
+        categorized: 0,
+        failed: [],
+        message: 'No uncategorized transactions found'
+      })
     }
 
-    // Categorize using AI
-    const categorized = await categorizeTransactionsBatch(body.transactions)
+    // Prepare transactions for AI categorization
+    const transactionsToCateg = transactions.map(t => ({
+      id: t.id,
+      description: t.description,
+      amount: t.amount,
+      merchant: t.merchant
+    }))
 
-    // If transaction IDs are provided, update them in the database
-    const transactionsWithIds = categorized.filter(c => c.id)
+    console.log(`🤖 Categorizing ${transactionsToCateg.length} transactions with AI...`)
 
-    if (transactionsWithIds.length > 0) {
-      // Verify all transactions belong to user's accounts
-      const transactionIds = transactionsWithIds.map(c => c.id!)
+    // Use AI to categorize
+    let categorizationResults
+    try {
+      categorizationResults = await categorizeTransactionsBatch(transactionsToCateg)
+    } catch (aiError) {
+      console.error('AI categorization failed:', aiError)
+      // Return transactions that need manual categorization
+      return NextResponse.json({
+        success: false,
+        needsManualCategorization: true,
+        transactions: transactions.map(t => ({
+          id: t.id,
+          description: t.description,
+          merchant: t.merchant,
+          amount: t.amount,
+          transaction_type: t.transaction_type
+        })),
+        error: 'AI categorization failed. Please categorize manually.'
+      })
+    }
 
-      const { data: userTransactions } = await supabase
-        .from('transactions')
-        .select('id, user_accounts!inner(user_id)')
-        .in('id', transactionIds)
-        .eq('user_accounts.user_id', user.id)
+    // Filter results - only update high confidence categorizations (>60%)
+    const lowConfidenceTransactions = transactions.filter((_, idx) => {
+      const result = categorizationResults[idx]
+      return !result || !result.confidence || result.confidence <= 0.6
+    })
 
-      if (!userTransactions || userTransactions.length !== transactionsWithIds.length) {
-        return NextResponse.json<CategorizeTransactionsResponse>(
-          { success: false, categorized: [], error: 'Some transactions not found or access denied' },
-          { status: 403 }
-        )
-      }
+    console.log(`✅ High confidence: ${transactions.length - lowConfidenceTransactions.length}, Low confidence: ${lowConfidenceTransactions.length}`)
 
-      // Update transactions with categories
-      const updates = categorized
-        .filter(c => c.id)
-        .map(c => ({
-          id: c.id!,
-          category: c.category,
-          category_confidence: c.confidence
-        }))
+    // Update high confidence transactions
+    const updates = []
+    const failed = []
 
-      // Batch update
-      for (const update of updates) {
-        await supabase
+    for (let i = 0; i < transactions.length; i++) {
+      const transaction = transactions[i]
+      const result = categorizationResults[i]
+
+      if (result && result.confidence && result.confidence > 0.6) {
+        const { error: updateError } = await supabase
           .from('transactions')
           .update({
-            category: update.category,
-            category_confidence: update.category_confidence
+            category: result.category,
+            category_confidence: result.confidence,
+            merchant: result.merchant || transaction.merchant
           })
-          .eq('id', update.id)
+          .eq('id', transaction.id)
+
+        if (updateError) {
+          console.error('Failed to update transaction:', updateError)
+          failed.push(transaction.id)
+        } else {
+          updates.push(transaction.id)
+        }
       }
     }
 
-    return NextResponse.json<CategorizeTransactionsResponse>({
+    // If there are low confidence transactions, return them for manual categorization
+    if (lowConfidenceTransactions.length > 0) {
+      return NextResponse.json({
+        success: true,
+        categorized: updates.length,
+        needsManualCategorization: true,
+        transactions: lowConfidenceTransactions.map(t => ({
+          id: t.id,
+          description: t.description,
+          merchant: t.merchant,
+          amount: t.amount,
+          transaction_type: t.transaction_type,
+          category: t.category
+        })),
+        message: `${updates.length} transactions categorized. ${lowConfidenceTransactions.length} need manual review.`
+      })
+    }
+
+    return NextResponse.json({
       success: true,
-      categorized: categorized.map(c => ({
-        id: c.id,
-        category: c.category,
-        confidence: c.confidence
-      }))
+      categorized: updates.length,
+      failed,
+      message: `Successfully categorized ${updates.length} transactions`
     })
 
   } catch (error) {
     console.error('POST /api/categorize error:', error)
-    return NextResponse.json<CategorizeTransactionsResponse>(
-      { success: false, categorized: [], error: error instanceof Error ? error.message : 'Internal server error' },
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * PUT /api/categorize - Manually update transaction categories
+ */
+export async function PUT(request: Request) {
+  try {
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    })
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid authentication' },
+        { status: 401 }
+      )
+    }
+
+    const { categorizations }: { categorizations: { [id: string]: string } } = await request.json()
+
+    if (!categorizations || Object.keys(categorizations).length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No categorizations provided' },
+        { status: 400 }
+      )
+    }
+
+    // Update each transaction
+    const updates = []
+    const failed = []
+
+    for (const [id, category] of Object.entries(categorizations)) {
+      const { error: updateError } = await supabase
+        .from('transactions')
+        .update({
+          category,
+          category_confidence: 1.0 // Manual categorization has 100% confidence
+        })
+        .eq('id', id)
+        .eq('user_id', user.id) // Ensure user owns this transaction
+
+      if (updateError) {
+        console.error('Failed to update transaction:', updateError)
+        failed.push(id)
+      } else {
+        updates.push(id)
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      updated: updates.length,
+      failed,
+      message: `Successfully updated ${updates.length} transactions`
+    })
+
+  } catch (error) {
+    console.error('PUT /api/categorize error:', error)
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }
