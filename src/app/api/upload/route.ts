@@ -5,7 +5,6 @@ import type { UploadStatementResponse } from '@/types/database'
 // Server-side Supabase client with service role
 // For file upload, we need service role to bypass RLS temporarily
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(request: Request) {
   try {
@@ -70,8 +69,6 @@ export async function POST(request: Request) {
     let accountNumber: string | undefined
     let parsedTransactions: any[] = []
     let potentialDuplicates = 0
-    let insertedCount = 0
-    let skippedCount = 0
 
     if (parsedData) {
       try {
@@ -85,14 +82,13 @@ export async function POST(request: Request) {
     }
 
     // Generate unique file path (no account needed)
-    const fileExt = file.name.split('.').pop()
     const timestamp = Date.now()
     const fileName = `${timestamp}-${file.name}`
     const filePath = `${user.id}/${fileName}`
 
     // Upload file to Supabase Storage
     const fileBuffer = await file.arrayBuffer()
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('bank-statements')
       .upload(filePath, fileBuffer, {
         contentType: file.type,
@@ -152,7 +148,7 @@ export async function POST(request: Request) {
 
         // Use upsert with onConflict to skip duplicates
         // We insert only if the transaction doesn't already exist
-        const { error: insertError, data: insertData, count } = await supabase
+        const { error: insertError } = await supabase
           .from('transactions')
           .upsert(batch, {
             onConflict: 'user_id,transaction_date,description,amount,transaction_type',
@@ -173,9 +169,6 @@ export async function POST(request: Request) {
             { status: 500 }
           )
         }
-
-        insertedCount += insertData?.length || 0
-        skippedCount += batch.length - (insertData?.length || 0)
       }
 
       // Generate insights asynchronously (fire and forget for performance)

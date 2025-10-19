@@ -58,7 +58,7 @@ export default function ChatPage() {
           content: 'Sorry, I encountered an error. Please try again.'
         }])
       }
-    } catch (error) {
+    } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'Failed to connect to the AI. Please try again.'

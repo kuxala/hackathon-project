@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
 
 // Example API route - GET
 export async function GET(request: Request) {
@@ -18,7 +17,7 @@ export async function GET(request: Request) {
       message: 'API working',
       timestamp: new Date().toISOString()
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -38,7 +37,7 @@ export async function POST(request: Request) {
       success: true,
       received: body
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

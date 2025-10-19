@@ -9,7 +9,7 @@ interface CategoryRiverChartProps {
   isInView?: boolean
 }
 
-export function CategoryRiverChart({ data, isInView = true }: CategoryRiverChartProps) {
+export function CategoryRiverChart({ data }: CategoryRiverChartProps) {
   const [visibleCategories, setVisibleCategories] = useState<Set<string>>(
     new Set(data?.layers?.slice(0, 6).map(l => l.category) || []) // Show top 6 by default
   )

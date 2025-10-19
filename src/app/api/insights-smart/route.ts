@@ -382,7 +382,7 @@ function analyzeCashFlow(transactions: any[], summary: SpendingSummary): Insight
 
     if (months.length >= 2) {
       const lastMonth = months[months.length - 1][1]
-      const avgMonthlySpending = months.reduce((sum, [_, data]) => sum + data.spending, 0) / months.length
+      const avgMonthlySpending = months.reduce((sum, [, data]) => sum + data.spending, 0) / months.length
       const avgDailySpending = avgMonthlySpending / 30
 
       // Predict next month

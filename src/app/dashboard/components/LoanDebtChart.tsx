@@ -75,28 +75,6 @@ export function LoanDebtChart({ value, percentageChange, isInView, data }: LoanD
     return result
   }, [data])
 
-  const getBarVariants = (targetHeight: string) => ({
-    hidden: {
-      height: '0%',
-      opacity: 0.3
-    },
-    visible: {
-      height: targetHeight,
-      opacity: 1,
-      transition: {
-        height: {
-          delay: 0.6,
-          duration: 0.8,
-          ease: [0.34, 1.56, 0.64, 1]
-        },
-        opacity: {
-          delay: 0.6,
-          duration: 0.4
-        }
-      }
-    }
-  })
-
   const labelVariants = {
     hidden: {
       opacity: 0,

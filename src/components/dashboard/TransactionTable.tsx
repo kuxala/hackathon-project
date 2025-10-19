@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -21,11 +21,7 @@ export function TransactionTable() {
   const [totalPages, setTotalPages] = useState(1)
   const pageSize = 20
 
-  useEffect(() => {
-    fetchTransactions()
-  }, [filter, categoryFilter, page])
-
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -76,7 +72,11 @@ export function TransactionTable() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter, categoryFilter, page])
+
+  useEffect(() => {
+    fetchTransactions()
+  }, [fetchTransactions])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

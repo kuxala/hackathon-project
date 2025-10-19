@@ -3,12 +3,6 @@
 import { motion } from 'framer-motion'
 import { useMemo } from 'react'
 
-interface MonthlyData {
-  month: string
-  spending: number
-  type: 'historical' | 'predicted'
-}
-
 interface PredictionComparisonChartProps {
   historicalData: Array<{
     month: string

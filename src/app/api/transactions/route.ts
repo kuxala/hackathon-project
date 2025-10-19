@@ -97,7 +97,7 @@ export async function GET(request: Request) {
     }
 
     // Remove the joined user_accounts data from response
-    const cleanTransactions = transactions.map(({ user_accounts, ...transaction }) => transaction)
+    const cleanTransactions = transactions.map(({ user_accounts: _user_accounts, ...transaction }) => transaction)
 
     return NextResponse.json<GetTransactionsResponse>({
       success: true,

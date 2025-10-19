@@ -52,7 +52,7 @@ export function useVoiceRecognition(onTranscript: (text: string) => void) {
           setIsListening(false)
         }
 
-        recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+        recognitionRef.current.onerror = () => {
           setIsListening(false)
         }
 

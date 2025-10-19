@@ -13,18 +13,10 @@ interface PsychologicalInsight {
   data: any
 }
 
-interface Summary {
-  income: number
-  spending: number
-  savings: number
-  savingsRate: number
-}
-
 export default function InsightsPage() {
   const { user, loading, signOut } = useAuth()
   const router = useRouter()
   const [insights, setInsights] = useState<PsychologicalInsight[]>([])
-  const [summary, setSummary] = useState<Summary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -59,7 +51,6 @@ export default function InsightsPage() {
       }
 
       setInsights(result.insights || [])
-      setSummary(result.summary || null)
     } catch (err) {
       console.error('Failed to fetch insights:', err)
       setError('Failed to load insights. Please try again.')
@@ -120,13 +111,6 @@ export default function InsightsPage() {
   }
 
   if (!user) return null
-
-  // Calculate hero metric
-  const heroMetric = summary ? {
-    value: Math.abs(summary.savings).toFixed(0),
-    label: summary.savings >= 0 ? 'saved this month' : 'short this month',
-    isPositive: summary.savings >= 0
-  } : null
 
   const renderInsightContent = (insight: PsychologicalInsight) => {
     switch (insight.type) {

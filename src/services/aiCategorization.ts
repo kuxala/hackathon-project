@@ -217,8 +217,8 @@ function fallbackCategorization(transaction: TransactionToCategorize): Categoriz
  * Learn from user corrections to improve categorization
  */
 export async function learnFromCorrection(
-  transaction: TransactionToCategorize,
-  userCategory: string
+  _transaction: TransactionToCategorize,
+  _userCategory: string
 ): Promise<void> {
   // This could be enhanced to:
   // 1. Store corrections in a database

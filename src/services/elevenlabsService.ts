@@ -44,7 +44,7 @@ export async function startConversation(
 /**
  * Convert audio blob to text using ElevenLabs STT
  */
-export async function speechToText(audioBuffer: Buffer): Promise<string> {
+export async function speechToText(_audioBuffer: Buffer): Promise<string> {
   try {
     // ElevenLabs doesn't have a direct STT endpoint in their SDK
     // We'll need to use their API directly or use Web Speech API on client
@@ -115,10 +115,10 @@ export interface VoiceInteractionResult {
 }
 
 export async function processVoiceInteraction(
-  audioBuffer: Buffer,
-  userId: string,
-  conversationHistory: any[],
-  userContext?: any
+  _audioBuffer: Buffer,
+  _userId: string,
+  _conversationHistory: any[],
+  _userContext?: any
 ): Promise<VoiceInteractionResult> {
   try {
     // This is a simplified flow - actual implementation will depend on
@@ -134,9 +134,11 @@ export async function processVoiceInteraction(
   }
 }
 
-export default {
+const elevenlabsService = {
   startConversation,
   speechToText,
   textToSpeech,
   processVoiceInteraction
 }
+
+export default elevenlabsService

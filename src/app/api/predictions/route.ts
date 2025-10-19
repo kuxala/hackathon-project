@@ -224,7 +224,7 @@ Provide detailed predictions with confidence levels and actionable insights.`
       const jsonMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
       const jsonText = jsonMatch ? jsonMatch[1] : aiResponse
       prediction = JSON.parse(jsonText)
-    } catch (parseError) {
+    } catch {
       console.error('Failed to parse AI response:', aiResponse)
       return NextResponse.json({
         error: 'Failed to parse prediction',

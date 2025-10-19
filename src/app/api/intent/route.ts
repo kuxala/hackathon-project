@@ -12,7 +12,7 @@ function extractNumber(text: string): number | null {
 
 export async function POST(request: Request) {
   try {
-    const { transcript, userId } = await request.json()
+    const { transcript } = await request.json()
     const authHeader = request.headers.get('authorization')
 
     // Auth check

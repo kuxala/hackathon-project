@@ -81,7 +81,6 @@ function mockProcessIntent(transcript: string) {
 export function GlobalVoiceControl() {
   const [transcript, setTranscript] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [lastResult, setLastResult] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const router = useRouter()
   const { speak } = useTextToSpeech()
@@ -122,7 +121,6 @@ export function GlobalVoiceControl() {
       }
 
       console.log('🤖 Intent result:', result)
-      setLastResult(result)
 
       if (result.voice_reply) {
         speak(result.voice_reply)
@@ -160,7 +158,6 @@ export function GlobalVoiceControl() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setTranscript('')
-    setLastResult(null)
   }
 
   // Add global keyboard shortcut

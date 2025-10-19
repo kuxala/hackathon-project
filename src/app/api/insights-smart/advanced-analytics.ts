@@ -131,7 +131,7 @@ export function detectAnomalies(transactions: any[]): Insight | null {
 
     // Find days with spending > 2 std deviations above mean
     const anomalies = Object.entries(dailySpending)
-      .filter(([_, amount]) => amount > avg + (2 * stdDev))
+      .filter(([, amount]) => amount > avg + (2 * stdDev))
       .sort((a, b) => b[1] - a[1])
 
     if (anomalies.length > 0) {
@@ -184,7 +184,7 @@ export function detectSubscriptions(transactions: any[]): Insight | null {
 
     // Find merchants with recurring similar amounts
     const potentialSubscriptions = Object.entries(merchantFrequency)
-      .filter(([_, data]) => {
+      .filter(([, data]) => {
         if (data.count < 2) return false
 
         // Check if amounts are similar (within 10%)
@@ -279,7 +279,6 @@ export function analyzeCategoryTrends(transactions: any[]): Insight | null {
     })
 
     if (maxGrowth > 20) {
-      const increase = currentAmount - prevAmount
       const projectedNextMonth = currentAmount * (1 + maxGrowth / 100)
 
       return {

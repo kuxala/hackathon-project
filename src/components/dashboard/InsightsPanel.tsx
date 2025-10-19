@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -17,11 +17,7 @@ export function InsightsPanel({ onGenerateInsights }: InsightsPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>('all')
 
-  useEffect(() => {
-    fetchInsights()
-  }, [filter])
-
-  const fetchInsights = async () => {
+  const fetchInsights = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -55,7 +51,11 @@ export function InsightsPanel({ onGenerateInsights }: InsightsPanelProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter])
+
+  useEffect(() => {
+    fetchInsights()
+  }, [fetchInsights])
 
   const generateInsights = async () => {
     setGenerating(true)

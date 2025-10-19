@@ -39,7 +39,7 @@ export function VoiceRecorder({ onRecordingComplete, onError, disabled }: VoiceR
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop()
-        } catch (e) {
+        } catch {
           // Ignore errors on cleanup
         }
       }
@@ -132,8 +132,6 @@ export function VoiceRecorder({ onRecordingComplete, onError, disabled }: VoiceR
       }
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop())
 

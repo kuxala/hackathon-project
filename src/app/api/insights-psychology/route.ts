@@ -132,7 +132,7 @@ function generatePsychologicalInsights(transactions: any[], summary: any): Psych
   return insights
 }
 
-function analyzeOpportunityCost(transactions: any[], summary: any): PsychologicalInsight | null {
+function analyzeOpportunityCost(transactions: any[], _summary: any): PsychologicalInsight | null {
   // Find the most frequent small expense category
   const categoryData: Record<string, { count: number, total: number }> = {}
 
@@ -253,11 +253,11 @@ function analyzeInvisibleLeaks(transactions: any[]): PsychologicalInsight | null
 
   // Find likely subscriptions (recurring small amounts)
   const likelySubscriptions = Object.entries(merchantFrequency)
-    .filter(([_, data]) => data.count >= 2 && data.avgAmount < 100 && data.avgAmount > 5)
+    .filter(([, data]) => data.count >= 2 && data.avgAmount < 100 && data.avgAmount > 5)
     .sort((a, b) => b[1].total - a[1].total)
 
   if (likelySubscriptions.length >= 3) {
-    const totalSubscriptionCost = likelySubscriptions.reduce((sum, [_, data]) => sum + data.avgAmount, 0)
+    const totalSubscriptionCost = likelySubscriptions.reduce((sum, [, data]) => sum + data.avgAmount, 0)
 
     return {
       type: 'invisible_leak',
@@ -345,7 +345,7 @@ function analyzeFutureSelf(transactions: any[], summary: any): PsychologicalInsi
   }
 }
 
-function analyzeLifestyleInflation(transactions: any[], summary: any): PsychologicalInsight | null {
+function analyzeLifestyleInflation(transactions: any[], _summary: any): PsychologicalInsight | null {
   // Group transactions by month
   const monthlyData: Record<string, { spending: number, income: number }> = {}
 
