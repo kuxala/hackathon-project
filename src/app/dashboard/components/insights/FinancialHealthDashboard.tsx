@@ -151,7 +151,7 @@ export function FinancialHealthDashboard({ data, isInView = true }: FinancialHea
               <div className="text-[10px] font-medium text-gray-400">{metric.name}</div>
               <div className="text-xs font-semibold text-gray-200 mt-0.5">
                 {metric.unit === '%' && `${metric.score.toFixed(1)}%`}
-                {metric.unit === '$' && `$${(metric.score / 1000).toFixed(1)}k`}
+                {metric.unit === '$' && `₾${(metric.score / 1000).toFixed(1)}k`}
                 {metric.unit === 'months' && `${metric.score.toFixed(1)}mo`}
                 {metric.unit === 'days' && `${metric.score.toFixed(0)}d`}
               </div>

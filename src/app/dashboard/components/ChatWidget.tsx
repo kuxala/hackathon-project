@@ -148,7 +148,7 @@ export function ChatWidget({ userId }: ChatWidgetProps) {
             setErrorMessage(null)
           }
         }}
-        className="fixed bottom-6 right-6 z-50 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-green-600 shadow-2xl hover:from-green-600 hover:to-green-700 transition-all hover:scale-110 ring-4 ring-green-100 dark:ring-green-900"
+        className="fixed bottom-4 right-4 z-50 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-green-600 shadow-2xl hover:from-green-600 hover:to-green-700 transition-all hover:scale-110 ring-4 ring-green-100 dark:ring-green-900 sm:bottom-6 sm:right-6"
         aria-label={isChatOpen ? 'Hide chat assistant' : 'Open chat assistant'}
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
@@ -159,9 +159,9 @@ export function ChatWidget({ userId }: ChatWidgetProps) {
       {isChatOpen && (
         <div
           ref={chatModalRef}
-          className="fixed bottom-24 right-6 z-50 flex h-[520px] w-[26rem] flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#0f1412] via-[#0c1711] to-[#101d15] shadow-[0_25px_70px_-30px_rgba(0,0,0,0.9)] backdrop-blur-xl"
+          className="fixed inset-x-4 bottom-20 z-50 flex h-[70vh] max-h-[calc(100vh-6rem)] w-auto flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#0f1412] via-[#0c1711] to-[#101d15] shadow-[0_25px_70px_-30px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:inset-x-auto sm:bottom-24 sm:right-6 sm:h-[520px] sm:w-[26rem]"
         >
-          <div className="relative bg-black/30 px-5 py-4 backdrop-blur-md">
+          <div className="relative bg-black/30 px-4 py-3 backdrop-blur-md sm:px-5 sm:py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-green-500 via-emerald-500 to-green-600 shadow-lg shadow-emerald-900/40 ring-2 ring-emerald-500/40">
@@ -193,7 +193,7 @@ export function ChatWidget({ userId }: ChatWidgetProps) {
           </div>
 
           <div
-            className="relative flex-1 space-y-4 overflow-y-auto bg-black/20 px-5 py-5 text-sm text-gray-100 backdrop-blur-sm"
+            className="relative flex-1 space-y-4 overflow-y-auto bg-black/20 px-4 py-4 text-sm text-gray-100 backdrop-blur-sm sm:px-5 sm:py-5"
             role="log"
             aria-live="polite"
             aria-label="Chat messages"
@@ -226,7 +226,7 @@ export function ChatWidget({ userId }: ChatWidgetProps) {
                   key={`${message.role}-${index}`}
                   className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}
                 >
-                  <div className="flex max-w-[75%] items-start gap-3">
+                  <div className="flex max-w-[85%] items-start gap-3 sm:max-w-[75%]">
                     {isAssistant && (
                       <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-green-500 via-emerald-500 to-green-600 shadow-md shadow-emerald-900/30">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
@@ -275,8 +275,8 @@ export function ChatWidget({ userId }: ChatWidgetProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="border-t border-white/10 bg-black/40 px-5 py-4 backdrop-blur-md">
-            <form onSubmit={handleSendMessage} className="flex items-end gap-3">
+          <div className="border-t border-white/10 bg-black/40 px-4 py-3 backdrop-blur-md sm:px-5 sm:py-4">
+            <form onSubmit={handleSendMessage} className="flex items-end gap-2 sm:gap-3">
               <input
                 ref={inputRef}
                 type="text"

@@ -1,4 +1,3 @@
-import { sendMessage } from './chatService'
 import type { Transaction, AIInsight } from '@/types/database'
 
 interface SpendingByCategory {
@@ -137,19 +136,19 @@ async function analyzeSpendingPatterns(
 
 TRANSACTION DATA:
 Total Transactions: ${stats.transactionCount}
-Total Spending (Debits): $${stats.totalDebits.toFixed(2)}
-Total Income (Credits): $${stats.totalCredits.toFixed(2)}
-Net Balance: $${stats.netIncome.toFixed(2)}
-Average Monthly Spending: $${stats.averageMonthlySpending.toFixed(2)}
+Total Spending (Debits): ₾${stats.totalDebits.toFixed(2)}
+Total Income (Credits): ₾${stats.totalCredits.toFixed(2)}
+Net Balance: ₾${stats.netIncome.toFixed(2)}
+Average Monthly Spending: ₾${stats.averageMonthlySpending.toFixed(2)}
 
 TOP SPENDING CATEGORIES:
 ${topCategories.map(([cat, data]) =>
-  `- ${cat}: $${data.total.toFixed(2)} (${data.percentage.toFixed(1)}%, ${data.count} transactions)`
+  `- ${cat}: ₾${data.total.toFixed(2)} (${data.percentage.toFixed(1)}%, ${data.count} transactions)`
 ).join('\n')}
 
 MONTHLY BREAKDOWN:
 ${stats.monthlyData.map(m =>
-  `- ${m.month}: Income $${m.credits.toFixed(2)}, Spent $${m.debits.toFixed(2)}`
+  `- ${m.month}: Income ₾${m.credits.toFixed(2)}, Spent ₾${m.debits.toFixed(2)}`
 ).join('\n')}
 
 Generate 2-3 financial insights in this EXACT JSON format:
@@ -215,6 +214,26 @@ IMPORTANT RULES:
   }
   */
 
+  // Calculate meaningful monthly metrics (not lifetime totals!)
+  const avgMonthlyIncome = stats.monthlyData.length > 0
+    ? stats.monthlyData.reduce((sum, m) => sum + m.credits, 0) / stats.monthlyData.length
+    : 0
+  const avgMonthlySpending = stats.monthlyData.length > 0
+    ? stats.monthlyData.reduce((sum, m) => sum + m.debits, 0) / stats.monthlyData.length
+    : 0
+  const lastMonthSpending = stats.monthlyData.length > 0
+    ? stats.monthlyData[stats.monthlyData.length - 1].debits
+    : 0
+  const savingsRate = avgMonthlyIncome > 0
+    ? ((avgMonthlyIncome - avgMonthlySpending) / avgMonthlyIncome) * 100
+    : 0
+
+  // Calculate month-over-month trend
+  const trendPercentage = stats.monthlyData.length >= 2
+    ? ((stats.monthlyData[stats.monthlyData.length - 1].debits - stats.monthlyData[stats.monthlyData.length - 2].debits)
+       / stats.monthlyData[stats.monthlyData.length - 2].debits) * 100
+    : 0
+
   // Rule-based insight with chart data (no AI for performance)
   const fallbackChartData = {
     monthlyTrend: {
@@ -231,10 +250,12 @@ IMPORTANT RULES:
       }))
     },
     budget: {
-      totalBudget: stats.totalCredits * 0.8,
-      totalSpent: stats.totalDebits,
-      utilizationPercentage: stats.totalCredits > 0 ? (stats.totalDebits / stats.totalCredits) * 100 : 0,
-      forecastEndOfMonth: stats.averageMonthlySpending * 1.1
+      // CORRECTED: Use monthly averages, not lifetime totals
+      averageMonthlySpending: avgMonthlySpending,
+      averageMonthlyIncome: avgMonthlyIncome,
+      savingsRate: savingsRate,
+      lastMonthSpending: lastMonthSpending,
+      trendPercentage: trendPercentage
     }
   }
 
@@ -242,7 +263,7 @@ IMPORTANT RULES:
     user_id: userId,
     insight_type: 'spending_pattern',
     title: 'Spending Analysis Complete',
-    description: `You spent $${stats.totalDebits.toFixed(2)} across ${stats.transactionCount} transactions.`,
+    description: `You spent ₾${stats.totalDebits.toFixed(2)} across ${stats.transactionCount} transactions.`,
     severity: 'info',
     data: fallbackChartData,
     is_read: false,
@@ -268,7 +289,7 @@ function generateBudgetRecommendations(
     user_id: userId,
     insight_type: 'budget_recommendation',
     title: '50/30/20 Budget Rule',
-    description: `Based on your average monthly spending of $${stats.averageMonthlySpending.toFixed(2)}, consider allocating: $${needs.toFixed(2)} for needs (50%), $${wants.toFixed(2)} for wants (30%), and $${savings.toFixed(2)} for savings (20%).`,
+    description: `Based on your average monthly spending of ₾${stats.averageMonthlySpending.toFixed(2)}, consider allocating: ₾${needs.toFixed(2)} for needs (50%), ₾${wants.toFixed(2)} for wants (30%), and ₾${savings.toFixed(2)} for savings (20%).`,
     severity: 'info',
     data: { needs, wants, savings, currentSpending: stats.averageMonthlySpending },
     is_read: false,
@@ -282,7 +303,7 @@ function generateBudgetRecommendations(
         user_id: userId,
         insight_type: 'budget_recommendation',
         title: `High ${category} Spending`,
-        description: `${category} represents ${data.percentage.toFixed(1)}% of your spending ($${data.total.toFixed(2)}). Consider setting a monthly budget to track this category.`,
+        description: `${category} represents ${data.percentage.toFixed(1)}% of your spending (₾${data.total.toFixed(2)}). Consider setting a monthly budget to track this category.`,
         severity: 'warning',
         data: { category, ...data },
         is_read: false,
@@ -339,7 +360,7 @@ function detectAnomalies(
           user_id: userId,
           insight_type: 'anomaly',
           title: `Unusual ${cat} Transaction`,
-          description: `A transaction of $${t.amount.toFixed(2)} at ${t.merchant || t.description} is significantly higher than your typical ${cat} spending (avg: $${stats.avg.toFixed(2)}).`,
+          description: `A transaction of ₾${t.amount.toFixed(2)} at ${t.merchant || t.description} is significantly higher than your typical ${cat} spending (avg: ₾${stats.avg.toFixed(2)}).`,
           severity: t.amount > stats.avg + 3 * stats.stdDev ? 'critical' : 'warning',
           data: { transaction: t, average: stats.avg, stdDev: stats.stdDev },
           is_read: false,
@@ -369,7 +390,7 @@ function identifySavingOpportunities(
       user_id: userId,
       insight_type: 'saving_opportunity',
       title: 'Positive Cash Flow',
-      description: `You're saving ${savingsRate.toFixed(1)}% of your income ($${stats.netIncome.toFixed(2)}). ${savingsRate < 20 ? 'Consider increasing to 20% for better financial health.' : 'Great job!'}`,
+      description: `You're saving ${savingsRate.toFixed(1)}% of your income (₾${stats.netIncome.toFixed(2)}). ${savingsRate < 20 ? 'Consider increasing to 20% for better financial health.' : 'Great job!'}`,
       severity: savingsRate < 10 ? 'warning' : 'info',
       data: { netIncome: stats.netIncome, savingsRate },
       is_read: false,
@@ -384,7 +405,7 @@ function identifySavingOpportunities(
         user_id: userId,
         insight_type: 'saving_opportunity',
         title: `Frequent Small ${category} Purchases`,
-        description: `You made ${data.count} ${category} transactions averaging $${(data.total / data.count).toFixed(2)} each, totaling $${data.total.toFixed(2)}. These small purchases can add up quickly.`,
+        description: `You made ${data.count} ${category} transactions averaging ₾${(data.total / data.count).toFixed(2)} each, totaling ₾${data.total.toFixed(2)}. These small purchases can add up quickly.`,
         severity: 'info',
         data: { category, ...data },
         is_read: false,
@@ -420,7 +441,7 @@ function analyzeTrends(
       user_id: userId,
       insight_type: 'trend_analysis',
       title: spendingChange > 0 ? 'Spending Increased' : 'Spending Decreased',
-      description: `Your spending ${spendingChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(spendingChange).toFixed(1)}% compared to the previous month (from $${prevMonth.debits.toFixed(2)} to $${lastMonth.debits.toFixed(2)}).`,
+      description: `Your spending ${spendingChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(spendingChange).toFixed(1)}% compared to the previous month (from ₾${prevMonth.debits.toFixed(2)} to ₾${lastMonth.debits.toFixed(2)}).`,
       severity: spendingChange > 20 ? 'warning' : 'info',
       data: { lastMonth, prevMonth, change: spendingChange },
       is_read: false,

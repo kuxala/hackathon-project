@@ -173,7 +173,7 @@ export function MonthlySpendingChart({ value, percentageChange, isInView, data }
                   transition={{ duration: 0.2, type: 'spring', stiffness: 300, damping: 20 }}
                 >
                   <div className="flex flex-col gap-1">
-                    <span className="text-gray-100 font-medium">${month.amount.toLocaleString()}</span>
+                    <span className="text-gray-100 font-medium">₾{month.amount.toLocaleString()}</span>
                     <span className="text-gray-400">Spent in {month.name}</span>
                   </div>
                   <div className="absolute left-1/2 -translate-x-1/2 bottom-0 translate-y-full">

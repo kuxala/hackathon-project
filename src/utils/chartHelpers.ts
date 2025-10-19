@@ -7,6 +7,31 @@
  * Convert array of numbers to SVG path for line/area charts
  * Maps data points to viewBox coordinates
  */
+
+/**
+ * Normalize raw amount values (numbers or formatted strings) into a finite number.
+ * Falls back to 0 when parsing fails.
+ */
+export function normalizeAmount(amount: unknown): number {
+  if (typeof amount === 'number' && Number.isFinite(amount)) {
+    return amount
+  }
+
+  if (typeof amount === 'string') {
+    const cleaned = amount.replace(/[^0-9.-]/g, '')
+    const parsed = Number(cleaned)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+
+  if (typeof amount === 'bigint') {
+    return Number(amount)
+  }
+
+  return 0
+}
+
 export function convertToSVGPath(
   data: number[],
   viewBoxWidth: number = 472,
@@ -155,23 +180,24 @@ export function buildSmoothAreaPath(topPoints: ChartPoint[], bottomPoints: Chart
  * Calculate bar chart heights as percentages
  * Uses square root scaling for better visual distribution when there's a large range
  */
-export function calculateBarPercentages(amounts: number[]): string[] {
+export function calculateBarPercentages(amounts: Array<number | string>): number[] {
   // Use magnitude so negative spending values still render correctly
-  const magnitudes = amounts.map(amount => Math.abs(amount))
+  const normalized = amounts.map(amount => normalizeAmount(amount))
+  const magnitudes = normalized.map(amount => Math.abs(amount))
   const max = Math.max(...magnitudes)
-  if (!isFinite(max) || max === 0) return amounts.map(() => '0%')
+  if (!isFinite(max) || max === 0) return amounts.map(() => 0)
 
   // Use square root scaling for better visual distribution
   const sqrtMax = Math.sqrt(max)
 
   return magnitudes.map(amount => {
-    if (amount === 0) return '2%' // Show tiny bar for zero
+    if (amount === 0) return 2 // Show tiny bar for zero
 
     // Square root scaling makes differences more visible
     const sqrtAmount = Math.sqrt(amount)
     const percentage = (sqrtAmount / sqrtMax) * 100
 
-    return `${Math.max(percentage, 8)}%` // Minimum 8% for visibility
+    return Math.max(percentage, 8) // Minimum 8% for visibility
   })
 }
 

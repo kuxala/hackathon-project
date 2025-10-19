@@ -220,7 +220,7 @@ export function SankeyDiagram({ data, isInView = true }: SankeyDiagramProps) {
 
       <div className="flex items-center justify-between text-[10px] text-gray-500 mt-3 pt-3 border-t border-gray-800/50">
         <span>Click categories to focus</span>
-        <span>${data.totalSpending.toLocaleString(undefined, { maximumFractionDigits: 0 })} spent</span>
+        <span>₾{data.totalSpending.toLocaleString(undefined, { maximumFractionDigits: 0 })} spent</span>
       </div>
     </div>
   )

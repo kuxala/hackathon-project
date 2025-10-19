@@ -96,10 +96,18 @@ export interface CategoryBreakdown {
 }
 
 export interface BudgetData {
-  totalBudget: number             // 5000
-  totalSpent: number              // 3847
-  utilizationPercentage: number   // 76.9
-  forecastEndOfMonth: number      // 4200
+  // Monthly averages (not lifetime totals!)
+  averageMonthlySpending: number     // 4200 - avg monthly spending
+  averageMonthlyIncome: number       // 5000 - avg monthly income
+  savingsRate: number                // 16.0 - percentage of income saved
+  lastMonthSpending: number          // 4350 - most recent month
+  trendPercentage: number            // 3.5 - month-over-month change %
+
+  // Legacy fields (deprecated, kept for backward compatibility)
+  totalBudget?: number
+  totalSpent?: number
+  utilizationPercentage?: number
+  forecastEndOfMonth?: number
 }
 
 export interface ChartData {

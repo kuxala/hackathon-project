@@ -23,7 +23,7 @@ export function SpendingIncomeChart({ value, percentageChange, isInView, data }:
     start: 0,
     duration: 1000,
     decimals: 0,
-    prefix: '$',
+    prefix: '₾',
     suffix: ''
   })
 
@@ -301,21 +301,21 @@ export function SpendingIncomeChart({ value, percentageChange, isInView, data }:
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-[#12a159]" />
                   <span className="text-gray-400">Income:</span>
-                  <span className="text-gray-100 font-medium">${hoveredPoint.income.toLocaleString()}</span>
+                  <span className="text-gray-100 font-medium">₾{hoveredPoint.income.toLocaleString()}</span>
                 </div>
               )}
               {showSpending && (
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-[#a78bfa]" />
                   <span className="text-gray-400">Spending:</span>
-                  <span className="text-gray-100 font-medium">${hoveredPoint.spending.toLocaleString()}</span>
+                  <span className="text-gray-100 font-medium">₾{hoveredPoint.spending.toLocaleString()}</span>
                 </div>
               )}
               {showIncome && showSpending && (
                 <div className="flex items-center gap-2 pt-1 border-t border-gray-700 mt-1">
                   <span className="text-gray-400">Difference:</span>
                   <span className={`font-medium ${hoveredPoint.income > hoveredPoint.spending ? 'text-green-500' : 'text-red-500'}`}>
-                    {hoveredPoint.income > hoveredPoint.spending ? '+' : '-'}${Math.abs(hoveredPoint.income - hoveredPoint.spending).toLocaleString()}
+                    {hoveredPoint.income > hoveredPoint.spending ? '+' : '-'}₾{Math.abs(hoveredPoint.income - hoveredPoint.spending).toLocaleString()}
                   </span>
                 </div>
               )}

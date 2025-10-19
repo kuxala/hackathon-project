@@ -256,7 +256,7 @@ export async function categorizeTransactionsBatch(
     amount: number
     merchant?: string
   }>,
-  batchSize: number = 20
+  batchSize: number = 100 // Increased for faster processing
 ): Promise<AICategorizationResult[]> {
   const results: AICategorizationResult[] = []
 
@@ -351,9 +351,9 @@ Respond with a JSON array:
         })
       }
 
-      // Rate limiting between batches
+      // Rate limiting between batches (reduced for speed)
       if (i + batchSize < transactions.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 200)) // Reduced from 1000ms
       }
 
     } catch (error) {

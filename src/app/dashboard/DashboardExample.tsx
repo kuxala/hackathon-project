@@ -9,7 +9,6 @@ import dynamic from 'next/dynamic'
 import { DashboardHeader } from './components/DashboardHeader'
 import { SpendingIncomeChart } from './components/SpendingIncomeChart'
 import { LoanDebtChart } from './components/LoanDebtChart'
-import { MonthlySpendingChart } from './components/MonthlySpendingChart'
 import { BudgetForecastChart } from './components/BudgetForecastChart'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
@@ -17,6 +16,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 const ChatWidget = dynamic(() => import('./components/ChatWidget').then(mod => ({ default: mod.ChatWidget })), { ssr: false })
 const FileUploadWidget = dynamic(() => import('@/components/dashboard/FileUploadWidget').then(mod => ({ default: mod.FileUploadWidget })), { ssr: false })
 import { supabase } from '@/lib/supabase'
+import { normalizeAmount } from '@/utils/chartHelpers'
 import type { ChartData } from '@/types/database'
 
 interface DashboardExampleProps {
@@ -135,6 +135,24 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
             // The AI didn't return the proper format, so use fallback from old stats
             const oldStats = spendingInsight.data
             if (oldStats && oldStats.monthlyData) {
+              // Calculate meaningful monthly metrics
+              const avgMonthlyIncome = oldStats.monthlyData.length > 0
+                ? oldStats.monthlyData.reduce((sum: number, m: any) => sum + m.credits, 0) / oldStats.monthlyData.length
+                : 0
+              const avgMonthlySpending = oldStats.monthlyData.length > 0
+                ? oldStats.monthlyData.reduce((sum: number, m: any) => sum + m.debits, 0) / oldStats.monthlyData.length
+                : 0
+              const lastMonthSpending = oldStats.monthlyData.length > 0
+                ? oldStats.monthlyData[oldStats.monthlyData.length - 1].debits
+                : 0
+              const savingsRate = avgMonthlyIncome > 0
+                ? ((avgMonthlyIncome - avgMonthlySpending) / avgMonthlyIncome) * 100
+                : 0
+              const trendPercentage = oldStats.monthlyData.length >= 2
+                ? ((oldStats.monthlyData[oldStats.monthlyData.length - 1].debits - oldStats.monthlyData[oldStats.monthlyData.length - 2].debits)
+                   / oldStats.monthlyData[oldStats.monthlyData.length - 2].debits) * 100
+                : 0
+
               const fallbackData = {
                 monthlyTrend: {
                   months: oldStats.monthlyData.map((m: any) => m.month),
@@ -152,21 +170,25 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
                     }))
                 },
                 budget: {
-                  totalBudget: oldStats.totalCredits * 0.8,
-                  totalSpent: oldStats.totalDebits,
-                  utilizationPercentage: oldStats.totalCredits > 0 ? (oldStats.totalDebits / oldStats.totalCredits) * 100 : 0,
-                  forecastEndOfMonth: oldStats.averageMonthlySpending * 1.1
+                  averageMonthlySpending: avgMonthlySpending,
+                  averageMonthlyIncome: avgMonthlyIncome,
+                  savingsRate: savingsRate,
+                  lastMonthSpending: lastMonthSpending,
+                  trendPercentage: trendPercentage
                 }
               }
               setChartData(fallbackData)
             }
           }
+        } else {
+          setChartData(null)
         }
       } else {
         setHasTransactions(false)
         setChartData(null)
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ Error fetching chart data:', error)
       setHasTransactions(false)
       setChartData(null)
     } finally {
@@ -349,40 +371,18 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
                 )}
               </div>
 
-            {/* Show category breakdown OR monthly spending chart */}
+            {/* Category Spending Breakdown */}
             <div className="lg:col-span-2 relative">
               {isLoadingCharts ? (
                 <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6 flex items-center justify-center min-h-[300px]">
                   <LoadingSpinner size="md" text="Loading chart data..." />
                 </div>
-              ) : chartData?.categoryBreakdown &&
-                chartData.categoryBreakdown.categories.length > 0 &&
-                !(chartData.categoryBreakdown.categories.length === 1 &&
-                  chartData.categoryBreakdown.categories[0].name === 'Uncategorized') ? (
-                <LoanDebtChart
-                  value={chartData.categoryBreakdown.categories.reduce((sum, c) => sum + c.amount, 0)}
-                  percentageChange={-2}
-                  isInView={isInView}
-                  data={chartData.categoryBreakdown}
-                />
-              ) : !chartData ? (
-                <div className="relative">
-                  <div className="absolute top-4 right-4 z-10 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 backdrop-blur-sm">
-                    <span className="text-xs font-medium text-blue-400">Sample Data</span>
-                  </div>
-                  <MonthlySpendingChart
-                    value={12000}
-                    percentageChange={-2}
-                    isInView={isInView}
-                    data={undefined}
-                  />
-                </div>
               ) : (
-                <MonthlySpendingChart
-                  value={chartData.monthlyTrend ? chartData.monthlyTrend.spending.reduce((sum, s) => sum + s, 0) : 12000}
+                <LoanDebtChart
+                  value={chartData?.categoryBreakdown ? chartData.categoryBreakdown.categories.reduce((sum, c) => sum + normalizeAmount(c.amount), 0) : 25000}
                   percentageChange={-2}
                   isInView={isInView}
-                  data={chartData.monthlyTrend}
+                  data={chartData?.categoryBreakdown}
                 />
               )}
             </div>
@@ -406,8 +406,8 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
                 </div>
               ) : (
                 <BudgetForecastChart
-                  value={chartData.budget?.forecastEndOfMonth || 5000}
-                  percentageChange={chartData.budget ? ((chartData.budget.forecastEndOfMonth - chartData.budget.totalSpent) / chartData.budget.totalSpent * 100) : 10}
+                  value={chartData.budget?.averageMonthlySpending || 5000}
+                  percentageChange={chartData.budget?.trendPercentage || 10}
                   isInView={isInView}
                   data={chartData.budget}
                 />

@@ -61,7 +61,7 @@ export async function chat(userMessage: string, conversationHistory: ChatMessage
   ]
 
   const response = await createChatCompletion({
-    model: 'openai/gpt-4.1-nano', // OpenAI GPT-4o Mini (cheaper, faster)
+    model: 'openai/gpt-4o-mini', // OpenAI GPT-4o Mini ($0.15/1M input, $0.60/1M output - very cheap & fast)
     messages,
     temperature: 0.7,
     max_tokens: 1000
@@ -70,7 +70,7 @@ export async function chat(userMessage: string, conversationHistory: ChatMessage
   return response.choices[0].message.content
 }
 
-// Helper function for structured data analysis using Gemini
+// Helper function for structured data analysis - FAST model for parsing
 export async function analyzeWithGemini(
   systemPrompt: string,
   userPrompt: string,
@@ -78,7 +78,7 @@ export async function analyzeWithGemini(
   maxTokens: number = 2000
 ) {
   const response = await createChatCompletion({
-    model: 'openai/gpt-5-mini', 
+    model: 'openai/gpt-4o-mini', // Fast & cheap for structured data ($0.15/1M tokens) 
     messages: [
       {
         role: 'system',

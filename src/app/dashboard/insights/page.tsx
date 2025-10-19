@@ -290,9 +290,9 @@ export default function InsightsPage() {
     <div className="min-h-screen bg-[#0a0a0a]">
       <DashboardHeader user={user} onSignOut={signOut} />
 
-      <main className="relative h-[calc(100vh-80px)] flex items-center justify-center px-6">
+      <main className="relative flex min-h-[calc(100vh-80px)] flex-col items-stretch justify-start gap-8 px-4 py-8 md:h-[calc(100vh-80px)] md:items-center md:justify-center md:gap-0 md:px-6 md:py-0">
         {error && (
-          <div className="absolute top-8 left-1/2 -translate-x-1/2 p-4 rounded-xl bg-red-500/10 border border-red-500/20 max-w-md">
+          <div className="absolute top-4 left-1/2 w-full max-w-sm -translate-x-1/2 rounded-xl border border-red-500/20 bg-red-500/10 p-4 md:top-8 md:max-w-md">
             <p className="text-sm text-red-300">{error}</p>
           </div>
         )}
@@ -323,23 +323,51 @@ export default function InsightsPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -100 }}
                   transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                  className="px-16 py-12"
+                  className="rounded-3xl border border-white/5 bg-white/[0.03] px-6 py-8 backdrop-blur md:border-0 md:bg-transparent md:px-16 md:py-12 md:backdrop-blur-0"
                 >
                   {/* Headline */}
-                  <h1 className="text-5xl font-light text-white mb-16 leading-tight">
+                  <h1 className="mb-8 text-3xl font-light leading-snug text-white md:mb-16 md:text-5xl md:leading-tight">
                     {currentInsight.headline}
                   </h1>
 
                   {/* Content */}
-                  <div className="text-base">
+                  <div className="text-sm md:text-base">
                     {renderInsightContent(currentInsight)}
                   </div>
                 </motion.div>
               </AnimatePresence>
+
+              <div className="mt-6 flex items-center justify-between rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white/70 backdrop-blur md:hidden">
+                <button
+                  onClick={prevSlide}
+                  disabled={currentSlide === 0}
+                  className="flex items-center gap-2 rounded-full border border-white/10 px-3 py-2 text-white/80 transition hover:border-white/30 hover:text-white disabled:opacity-40 disabled:hover:border-white/10"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span className="text-xs uppercase tracking-wide">Prev</span>
+                </button>
+
+                <span className="text-xs uppercase tracking-[0.3em] text-white/60">
+                  {currentSlide + 1} / {insights.length}
+                </span>
+
+                <button
+                  onClick={nextSlide}
+                  disabled={currentSlide === insights.length - 1}
+                  className="flex items-center gap-2 rounded-full border border-white/10 px-3 py-2 text-white/80 transition hover:border-white/30 hover:text-white disabled:opacity-40 disabled:hover:border-white/10"
+                >
+                  <span className="text-xs uppercase tracking-wide">Next</span>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Navigation Controls */}
-            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-8">
+            <div className="absolute bottom-12 left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
               {/* Previous Button */}
               <button
                 onClick={prevSlide}
@@ -379,12 +407,12 @@ export default function InsightsPage() {
             </div>
 
             {/* Slide Counter */}
-            <div className="absolute top-8 right-8 text-white/30 text-sm">
+            <div className="absolute top-8 right-8 hidden text-sm text-white/30 md:block">
               {currentSlide + 1} / {insights.length}
             </div>
 
             {/* Keyboard Hint */}
-            <div className="absolute top-8 left-8 text-white/20 text-xs">
+            <div className="absolute top-8 left-8 hidden text-xs text-white/20 md:block">
               Use arrow keys to navigate
             </div>
           </>

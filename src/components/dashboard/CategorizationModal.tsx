@@ -150,7 +150,7 @@ export function CategorizationModal({ isOpen, transactions, onClose, onSave }: C
                     : 'text-red-400'
                 }`}>
                   {currentTransaction.transaction_type === 'credit' ? '+' : '-'}
-                  ${currentTransaction.amount.toFixed(2)}
+                  ₾{currentTransaction.amount.toFixed(2)}
                 </p>
               </div>
             </div>

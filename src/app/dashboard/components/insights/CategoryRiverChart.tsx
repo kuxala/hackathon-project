@@ -227,7 +227,7 @@ export function CategoryRiverChart({ data, isInView = true }: CategoryRiverChart
               />
               <span>{layer.category}</span>
               <span className="text-gray-600 text-[9px]">
-                ${total >= 1000 ? `${(total / 1000).toFixed(1)}k` : total.toFixed(0)}
+                ₾{total >= 1000 ? `${(total / 1000).toFixed(1)}k` : total.toFixed(0)}
               </span>
             </button>
           )

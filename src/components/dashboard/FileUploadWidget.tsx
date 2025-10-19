@@ -2,7 +2,6 @@
 
 import { useState, useCallback, ChangeEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { parseFile, ParseResult } from '@/services/fileParser'
 import { supabase } from '@/lib/supabase'
 
 interface FileUploadWidgetProps {
@@ -13,16 +12,18 @@ export function FileUploadWidget({ onUploadComplete }: FileUploadWidgetProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [parseResult, setParseResult] = useState<ParseResult | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showConfirmation, setShowConfirmation] = useState(false)
 
-  const uploadParsedFile = useCallback(async (result: ParseResult) => {
-    if (!selectedFile) return
+
+  const handleFileSelect = useCallback(async (file: File) => {
+    setSelectedFile(file)
+    setError(null)
+    setUploadSuccess(false)
+    setIsUploading(true)
 
     try {
-      // Get user session
+      // Get user session for authentication
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
@@ -31,102 +32,74 @@ export function FileUploadWidget({ onUploadComplete }: FileUploadWidgetProps) {
         return
       }
 
-      // Create form data
-      const formData = new FormData()
-      formData.append('file', selectedFile)
-      formData.append('parsed_data', JSON.stringify(result))
+      // Step 1: Parse the file with AI
+      const parseFormData = new FormData()
+      parseFormData.append('file', file)
 
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 10, 90))
-      }, 200)
+      const parseResponse = await fetch('/api/parse-file', {
+        method: 'POST',
+        body: parseFormData,
+        keepalive: true
+      })
 
-      // Upload to API
-      const response = await fetch('/api/upload', {
+      const parseResult = await parseResponse.json()
+
+      if (!parseResponse.ok || !parseResult.success) {
+        throw new Error(parseResult.error || 'Failed to parse file')
+      }
+
+      // Step 2: Upload file with parsed data
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      uploadFormData.append('parsed_data', JSON.stringify(parseResult))
+
+      const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: formData,
+        body: uploadFormData,
         keepalive: true
       })
 
-      clearInterval(progressInterval)
-      setUploadProgress(100)
+      const uploadResult = await uploadResponse.json() as { success?: boolean; error?: string }
 
-      const uploadResult = await response.json()
-
-      if (!response.ok || !uploadResult.success) {
+      if (!uploadResponse.ok || !uploadResult.success) {
         throw new Error(uploadResult.error || 'Upload failed')
       }
 
-      // Success!
+      // Success! File uploaded and transactions saved
+      setUploadSuccess(true)
+      setIsUploading(false)
+
+      // Step 3: Categorize in background (don't wait for it)
+      fetch('/api/categorize', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fileName: file.name })
+      })
+        .then(res => res.json())
+        .then(result => console.log('✅ Background categorization complete:', result))
+        .catch(err => console.error('❌ Background categorization failed:', err))
+
+      // Call completion callback immediately to refresh data (no page reload)
+      onUploadComplete?.()
+
+      // Keep success message visible longer so user sees it
       setTimeout(() => {
         setSelectedFile(null)
-        setParseResult(null)
-        setUploadProgress(0)
-        setIsUploading(false)
-        onUploadComplete?.()
-      }, 500)
+        setUploadSuccess(false)
+      }, 5000)
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      console.error('Upload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to upload file')
       setIsUploading(false)
-      setUploadProgress(0)
     }
-  }, [selectedFile, onUploadComplete])
-
-  const handleFileSelect = useCallback(async (file: File) => {
-    setSelectedFile(file)
-    setError(null)
-    setParseResult(null)
-    setShowConfirmation(false)
-
-    // Validate file
-    const validTypes = ['.csv', '.xlsx', '.xls', '.pdf']
-    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
-
-    if (!validTypes.includes(ext)) {
-      setError('Invalid file type. Please upload CSV, Excel, or PDF files.')
-      return
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File size must be less than 10MB.')
-      return
-    }
-
-    // Parse file for preview (SERVER-SIDE with AI)
-    try {
-
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const response = await fetch('/api/parse-file', {
-        method: 'POST',
-        body: formData,
-        keepalive: true // Continue fetch even if user switches tabs
-      })
-
-      const result = await response.json()
-
-      setParseResult(result)
-
-      if (!result.success) {
-        setError(result.error || 'Failed to parse file')
-        setIsUploading(false) // Hide loading state
-      } else {
-        // Auto-upload without confirmation (confirmation disabled)
-        await uploadParsedFile(result)
-        // Show confirmation modal after successful parse (DISABLED)
-        // setShowConfirmation(true)
-      }
-    } catch (err) {
-      console.error('❌ Parse error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to parse file')
-      setIsUploading(false) // Hide loading state on error
-    }
-  }, [])
+  }, [onUploadComplete])
 
   const handleFileChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -154,101 +127,6 @@ export function FileUploadWidget({ onUploadComplete }: FileUploadWidgetProps) {
     }
   }, [handleFileSelect])
 
-  const handleReparse = useCallback(async () => {
-    if (!selectedFile) return
-
-    setError(null)
-    setParseResult(null)
-    setShowConfirmation(false)
-
-    // Re-parse the file (SERVER-SIDE)
-    try {
-
-      const formData = new FormData()
-      formData.append('file', selectedFile)
-
-      const response = await fetch('/api/parse-file', {
-        method: 'POST',
-        body: formData,
-        keepalive: true // Continue fetch even if user switches tabs
-      })
-
-      const result = await response.json()
-
-      setParseResult(result)
-
-      if (!result.success) {
-        setError(result.error || 'Failed to parse file')
-      } else {
-        setShowConfirmation(true)
-      }
-    } catch (err) {
-      console.error('❌ Re-parse error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to parse file')
-    }
-  }, [selectedFile])
-
-  const handleUpload = useCallback(async () => {
-    if (!selectedFile || !parseResult?.success) return
-
-    setShowConfirmation(false)
-    setIsUploading(true)
-    setUploadProgress(0)
-    setError(null)
-
-    try {
-      // Get user session
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        setError('You must be logged in to upload files')
-        setIsUploading(false)
-        return
-      }
-
-      // Create form data
-      const formData = new FormData()
-      formData.append('file', selectedFile)
-      formData.append('parsed_data', JSON.stringify(parseResult))
-
-      // Simulate progress (since FormData doesn't support progress events easily)
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 10, 90))
-      }, 200)
-
-      // Upload to API
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: formData
-      })
-
-      clearInterval(progressInterval)
-      setUploadProgress(100)
-
-      const result = await response.json()
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Upload failed')
-      }
-
-      // Success!
-      setTimeout(() => {
-        setSelectedFile(null)
-        setParseResult(null)
-        setUploadProgress(0)
-        setIsUploading(false)
-        onUploadComplete?.()
-      }, 500)
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
-      setIsUploading(false)
-      setUploadProgress(0)
-    }
-  }, [selectedFile, parseResult, onUploadComplete])
 
   return (
     <div className="space-y-4">
@@ -340,18 +218,6 @@ export function FileUploadWidget({ onUploadComplete }: FileUploadWidgetProps) {
                 </div>
               </div>
 
-              {/* Retry button */}
-              {selectedFile && (
-                <button
-                  onClick={() => {
-                    setError(null)
-                    handleFileSelect(selectedFile)
-                  }}
-                  className="w-full px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition-colors"
-                >
-                  Try Again
-                </button>
-              )}
             </div>
           </motion.div>
         )}
@@ -359,65 +225,19 @@ export function FileUploadWidget({ onUploadComplete }: FileUploadWidgetProps) {
 
       {/* Loading State */}
       <AnimatePresence>
-        {isUploading && !parseResult && (
+        {isUploading && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="rounded-lg border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6"
           >
-            <div className="flex flex-col items-center gap-4">
-              {/* Animated Spinner with Dots */}
-              <div className="relative h-20 w-20">
-                {/* Outer spinning ring */}
-                <div className="absolute inset-0 rounded-full border-4 border-gray-700/30"></div>
-                <div className="absolute inset-0 rounded-full border-4 border-t-green-500 border-r-green-400 animate-spin"></div>
-
-                {/* Inner pulsing dot */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <motion.div
-                    className="h-3 w-3 rounded-full bg-green-500"
-                    animate={{
-                      scale: [1, 1.5, 1],
-                      opacity: [1, 0.5, 1],
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Loading Text with Animation */}
-              <div className="text-center space-y-2">
-                <motion.p
-                  className="text-sm font-medium text-gray-200"
-                  animate={{ opacity: [1, 0.7, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  Analyzing file with AI...
-                </motion.p>
-                <div className="flex items-center gap-1 justify-center">
-                  <motion.span
-                    className="h-1.5 w-1.5 rounded-full bg-green-500"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
-                  />
-                  <motion.span
-                    className="h-1.5 w-1.5 rounded-full bg-green-500"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
-                  />
-                  <motion.span
-                    className="h-1.5 w-1.5 rounded-full bg-green-500"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
-                  />
-                </div>
+            <div className="flex items-center gap-4">
+              <div className="h-8 w-8 rounded-full border-4 border-gray-700 border-t-green-500 animate-spin"></div>
+              <div>
+                <p className="text-sm font-medium text-gray-200">Processing file...</p>
                 <p className="text-xs text-gray-400">
-                  Detecting columns and categorizing transactions
+                  {selectedFile?.name} • Parsing, uploading, and categorizing
                 </p>
               </div>
             </div>
@@ -425,154 +245,28 @@ export function FileUploadWidget({ onUploadComplete }: FileUploadWidgetProps) {
         )}
       </AnimatePresence>
 
-      {/* Preview */}
+      {/* Success State */}
       <AnimatePresence>
-        {selectedFile && parseResult?.success && (
+        {uploadSuccess && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="rounded-lg border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-4 space-y-4"
+            exit={{ opacity: 0, y: -10 }}
+            className="rounded-lg border border-green-500/30 bg-green-500/10 p-6"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-200">{selectedFile.name}</p>
-                  <p className="text-xs text-gray-400">
-                    {(selectedFile.size / 1024).toFixed(1)} KB • {parseResult.transactions.length} transactions
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setSelectedFile(null)
-                  setParseResult(null)
-                }}
-                className="text-gray-400 hover:text-gray-200"
-                disabled={isUploading}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            <div className="flex items-center gap-4">
+              <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
-              </button>
-            </div>
-
-            {/* Bank Info */}
-            {parseResult.detectedBank && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm3 5a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm0 3a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clipRule="evenodd" />
-                </svg>
-                <div className="flex-1">
-                  <p className="text-xs text-gray-400">Detected Bank</p>
-                  <p className="text-sm font-medium text-blue-400">
-                    {parseResult.detectedBank}
-                    {parseResult.accountNumber && ` • ${parseResult.accountNumber}`}
-                  </p>
-                </div>
               </div>
-            )}
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <p className="text-xs text-gray-400">Period</p>
-                <p className="text-sm font-medium text-gray-200">
-                  {parseResult.periodStart && parseResult.periodEnd
-                    ? `${new Date(parseResult.periodStart).toLocaleDateString()} - ${new Date(parseResult.periodEnd).toLocaleDateString()}`
-                    : 'N/A'}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-400">Income</p>
-                <p className="text-sm font-medium text-green-500">
-                  ${parseResult.totalCredits.toLocaleString()}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-400">Spending</p>
-                <p className="text-sm font-medium text-rose-500">
-                  ${parseResult.totalDebits.toLocaleString()}
+              <div>
+                <p className="text-sm font-medium text-green-400">Upload complete!</p>
+                <p className="text-xs text-green-300/80">
+                  Transactions saved • Categorization running in background
                 </p>
               </div>
             </div>
-
-            {/* Confirmation or Upload Button */}
-            {!showConfirmation ? (
-              <button
-                onClick={() => setShowConfirmation(true)}
-                disabled={isUploading}
-                className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Review Before Upload
-              </button>
-            ) : (
-              <div className="space-y-3">
-                <div className="p-4 rounded-lg border-2 border-yellow-500/30 bg-yellow-500/10">
-                  <div className="flex items-start gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-yellow-500">Please Review the Data</p>
-                      <p className="text-xs text-yellow-400/80 mt-1">
-                        Check if the amounts look correct. If something seems wrong, try re-parsing or upload a different file.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleReparse}
-                    disabled={isUploading}
-                    className="flex-1 rounded-lg bg-gray-600 px-4 py-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
-                  >
-                    🔄 Re-parse
-                  </button>
-                  <button
-                    onClick={handleUpload}
-                    disabled={isUploading}
-                    className="flex-1 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
-                  >
-                    ✓ Looks Good, Upload
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setSelectedFile(null)
-                    setParseResult(null)
-                    setShowConfirmation(false)
-                  }}
-                  className="w-full text-sm text-gray-400 hover:text-gray-200"
-                >
-                  Cancel & Choose Different File
-                </button>
-              </div>
-            )}
-
-            {/* Progress Bar */}
-            {isUploading && (
-              <div className="space-y-2">
-                <div className="h-2 w-full bg-[rgb(30,30,30)] rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-green-500"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${uploadProgress}%` }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </div>
-                <p className="text-xs text-center text-gray-400">
-                  {uploadProgress}% complete
-                </p>
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
