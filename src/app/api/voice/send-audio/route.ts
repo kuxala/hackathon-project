@@ -11,7 +11,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { transcript, userId, history, conversationId } = body
+    const { transcript, userId, history, conversationId, cachedContext } = body
 
     if (!transcript) {
       return NextResponse.json(
@@ -23,9 +23,12 @@ export async function POST(request: Request) {
     // Get auth token from request header
     const authHeader = request.headers.get('authorization')
 
-    // Authenticate user and get context
-    let userContext = null
-    if (authHeader && userId) {
+    // Use cached context if provided, otherwise fetch from database
+    let userContext = cachedContext || null
+    let fetchedFromDB = false
+
+    // Only fetch from DB if we don't have cached context
+    if (!userContext && authHeader && userId) {
       try {
         const supabase = createClient(supabaseUrl, supabaseAnonKey, {
           global: { headers: { Authorization: authHeader } }
@@ -34,6 +37,7 @@ export async function POST(request: Request) {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
 
         if (!authError && user && user.id === userId) {
+          console.log('[Voice API] Cache miss: Fetching financial data from database')
           // Get user's financial data summary
           const dataSummary = await getUserTransactionSummary(
             userId,
@@ -50,11 +54,14 @@ export async function POST(request: Request) {
               dateRange: dataSummary.dateRange,
               recentTransactions: dataSummary.recentTransactions
             }
+            fetchedFromDB = true
           }
         }
       } catch (contextError) {
         console.error('Failed to fetch user context:', contextError)
       }
+    } else if (userContext) {
+      console.log('[Voice API] Cache hit: Using cached financial data')
     }
 
     // Modify the transcript to request concise responses for voice
@@ -79,7 +86,9 @@ export async function POST(request: Request) {
       transcript,
       responseText: chatResponse.message,
       audioData: audioBase64,
-      conversationId: conversationId || chatResponse.conversationId
+      conversationId: conversationId || chatResponse.conversationId,
+      // Return user context if we fetched from DB (for caching on client)
+      userContext: fetchedFromDB ? userContext : undefined
     })
   } catch (error) {
     console.error('Send audio error:', error)

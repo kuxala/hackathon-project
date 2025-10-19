@@ -11,7 +11,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { message, history, userId } = body
+    const { message, history, userId, cachedContext } = body
 
     if (!message) {
       return NextResponse.json(
@@ -23,9 +23,12 @@ export async function POST(request: Request) {
     // Get auth token from request header
     const authHeader = request.headers.get('authorization')
 
-    // Authenticate user if auth header is provided
-    let userContext = null
-    if (authHeader && userId) {
+    // Use cached context if provided, otherwise fetch from database
+    let userContext = cachedContext || null
+    let fetchedFromDB = false
+
+    // Only fetch from DB if we don't have cached context
+    if (!userContext && authHeader && userId) {
       try {
         const supabase = createClient(supabaseUrl, supabaseAnonKey, {
           global: { headers: { Authorization: authHeader } }
@@ -34,6 +37,7 @@ export async function POST(request: Request) {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
 
         if (!authError && user && user.id === userId) {
+          console.log('[API] Cache miss: Fetching financial data from database')
           // Get user's financial data summary
           const dataSummary = await getUserTransactionSummary(userId, authHeader.replace('Bearer ', ''))
 
@@ -47,12 +51,15 @@ export async function POST(request: Request) {
               dateRange: dataSummary.dateRange,
               recentTransactions: dataSummary.recentTransactions
             }
+            fetchedFromDB = true
           }
         }
       } catch (contextError) {
         // Log but don't fail if we can't get user context
         console.error('Failed to fetch user context:', contextError)
       }
+    } else if (userContext) {
+      console.log('[API] Cache hit: Using cached financial data')
     }
 
     // Call chat service to get AI response with user context
@@ -66,7 +73,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: response.message,
-      conversationId: response.conversationId
+      conversationId: response.conversationId,
+      // Return user context if we fetched from DB (for caching on client)
+      userContext: fetchedFromDB ? userContext : undefined
     })
   } catch (error) {
     console.error('Chat API error:', error)

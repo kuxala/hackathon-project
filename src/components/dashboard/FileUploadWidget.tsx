@@ -3,6 +3,7 @@
 import { useState, useCallback, ChangeEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { invalidateCachedFinancialData } from '@/services/financialDataCache'
 
 interface FileUploadWidgetProps {
   onUploadComplete?: () => void
@@ -71,6 +72,12 @@ export function FileUploadWidget({ onUploadComplete }: FileUploadWidgetProps) {
       // Success! File uploaded and transactions saved
       setUploadSuccess(true)
       setIsUploading(false)
+
+      // Invalidate cached financial data since we have new transactions
+      if (session.user?.id) {
+        invalidateCachedFinancialData(session.user.id)
+        console.log('🗑️ Cache invalidated: New transactions uploaded')
+      }
 
       // Step 3: Categorize in background (don't wait for it)
       fetch('/api/categorize', {

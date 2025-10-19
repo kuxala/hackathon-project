@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { sendChatMessage } from '@/services/cachedChatService'
 
 import type { ChatMessage } from '@/lib/openrouter'
 
@@ -76,30 +77,13 @@ export function ChatWidget({ userId }: ChatWidgetProps) {
       // Get auth token from Supabase
       const { data: { session } } = await supabase.auth.getSession()
 
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      }
-
-      // Add authorization header if session exists
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
-      }
-
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          message: trimmedMessage,
-          history,
-          userId
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error(await response.text())
-      }
-
-      const data: { success?: boolean; message?: string } = await response.json()
+      // Use cached chat service (handles caching internally)
+      const data = await sendChatMessage(
+        trimmedMessage,
+        userId,
+        history,
+        session?.access_token
+      )
 
       if (!data.success || !data.message) {
         throw new Error('Invalid response from chat service')

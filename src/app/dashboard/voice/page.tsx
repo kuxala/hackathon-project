@@ -4,6 +4,7 @@ import { useCallback, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { sendVoiceMessage } from '@/services/cachedChatService'
 import { VoiceRecorder } from '../components/VoiceRecorder'
 import { AudioPlayer } from '../components/AudioPlayer'
 import type { ChatMessage } from '@/lib/openrouter'
@@ -63,40 +64,14 @@ export default function VoicePage() {
       // Get auth token
       const { data: { session } } = await supabase.auth.getSession()
 
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      }
-
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
-      }
-
-      // Send transcript to voice API
-      console.log('Sending payload:', { transcript, userId: user?.id })
-
-      const response = await fetch('/api/voice/send-audio', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          transcript,
-          history,
-          userId: user?.id,
-          conversationId
-        })
-      })
-
-      console.log('API response received, status:', response.status)
-
-      if (!response.ok) {
-        throw new Error(await response.text())
-      }
-
-      const data: {
-        success?: boolean
-        responseText?: string
-        audioData?: string
-        conversationId?: string
-      } = await response.json()
+      // Use cached voice service (handles caching internally)
+      const data = await sendVoiceMessage(
+        transcript,
+        user?.id,
+        history,
+        session?.access_token,
+        conversationId
+      )
 
       if (!data.success || !data.responseText || !data.audioData) {
         console.log('Invalid API response:', data)

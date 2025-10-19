@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { clearAllFinancialCaches } from '@/services/financialDataCache'
 
 type AuthContextType = {
   user: User | null
@@ -63,6 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    // Clear all cached data before signing out for security
+    clearAllFinancialCaches()
+    console.log('🗑️ All caches cleared on logout')
+
     const { error } = await supabase.auth.signOut()
     if (error) throw error
   }
