@@ -215,10 +215,7 @@ export async function POST(request: Request) {
     return NextResponse.json<UploadStatementResponse>({
       success: true,
       statement_id: `${timestamp}`, // Use timestamp as ID
-      preview,
-      message: parsedTransactions.length > 0
-        ? `Successfully imported ${insertedCount || parsedTransactions.length} transactions${skippedCount > 0 ? ` (${skippedCount} duplicates skipped)` : ''}`
-        : 'File uploaded but no valid transactions found'
+      preview
     })
 
   } catch (error) {

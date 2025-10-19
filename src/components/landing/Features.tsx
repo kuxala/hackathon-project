@@ -1,44 +1,50 @@
+import Image from "next/image"
+
 export default function Features() {
   const features = [
     {
-      title: "Instant AI Analysis",
+      title: "Upload XLSX, Get Categorized Insights",
       description: (
         <>
-          Simply upload your financial documents and get <span className="text-green-400 font-semibold">immediate insights</span>. Our AI assistant analyzes your data <span className="text-green-400 font-semibold">in seconds</span>, identifying spending patterns, trends, and opportunities you might have missed.
+          Drag in your bank or expense spreadsheets and our AI <span className="text-green-400 font-semibold">ingests every row automatically</span>. It parses the XLSX, classifies transactions, and <span className="text-green-400 font-semibold">persists structured records</span> so you can explore clean, categorized data without manual sorting.
         </>
       ),
       align: "left" as const,
-      imagePlaceholder: "AI Chat Interface"
+      image: "/section-1.png",
+      imageAlt: "AI dashboard displaying instant financial analysis"
     },
     {
-      title: "Natural Conversation",
+      title: "Visual Dashboards You Can Trust",
       description: (
         <>
-          Ask questions about your finances in <span className="text-green-400 font-semibold">plain English</span>. 'Where did I spend the most last month?' 'How can I save more?' Your AI assistant understands and responds with <span className="text-green-400 font-semibold">clear, actionable answers</span>.
+          Instantly explore the categorized data in a <span className="text-green-400 font-semibold">beautiful analytics workspace</span>. Interactive charts highlight spending trends, category breakdowns, and cash flow so you can <span className="text-green-400 font-semibold">see the story behind every upload</span>.
         </>
       ),
       align: "right" as const,
-      imagePlaceholder: "Chat Conversation"
+      image: "/section-2.png",
+      imageAlt: "Financial dashboard with charts summarizing categorized data"
     },
     {
-      title: "Smart Recommendations",
+      title: "AI-Powered Forecasting",
       description: (
         <>
-          Receive <span className="text-green-400 font-semibold">personalized advice</span> based on your actual financial data. From budget optimization to saving strategies, your AI assistant provides recommendations <span className="text-green-400 font-semibold">tailored specifically to your situation</span>.
+          Move from hindsight to foresight as the AI <span className="text-green-400 font-semibold">studies last month&apos;s patterns</span> and projects your upcoming income and expenses. See predicted cash flow, anticipate shortfalls, and <span className="text-green-400 font-semibold">plan with confidence before the month begins</span>.
         </>
       ),
       align: "left" as const,
-      imagePlaceholder: "AI Insights"
+      image: "/section-3.png",
+      imageAlt: "AI prediction dashboard projecting next month finances"
     },
     {
-      title: "Secure & Private",
+      title: "Insightful Perspectives",
       description: (
         <>
-          Your financial data <span className="text-green-400 font-semibold">never leaves your control</span>. Bank-level encryption, secure authentication, and <span className="text-green-400 font-semibold">complete privacy</span> ensure your sensitive information stays confidential and protected.
+          Unlock new angles on your finances as the AI delivers <span className="text-green-400 font-semibold">unique narratives for your income and spending</span>. Discover hidden drivers, spotlight unusual activity, and <span className="text-green-400 font-semibold">understand the &ldquo;why&rdquo; behind every trend</span> with story-driven insights.
         </>
       ),
       align: "right" as const,
-      imagePlaceholder: "Security Features"
+      image: "/section-4.png",
+      imageAlt: "AI insights page describing income and spending trends"
     }
   ]
 
@@ -63,16 +69,17 @@ export default function Features() {
               } gap-12 items-center`}
             >
               <div className="flex-1">
-                <div className="w-full h-80 bg-gradient-to-br from-foreground/5 to-foreground/10 rounded-2xl border border-border flex items-center justify-center overflow-hidden relative group">
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  <div className="text-center z-10">
-                    <div className="text-foreground/30 text-sm font-medium mb-2">
-                      [Image Placeholder]
-                    </div>
-                    <div className="text-foreground/40 text-lg font-semibold">
-                      {feature.imagePlaceholder}
-                    </div>
-                  </div>
+                <div className="group relative h-auto w-full overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-foreground/5 to-foreground/10">
+                  <Image
+                    src={feature.image}
+                    alt={feature.imageAlt}
+                    width={960}
+                    height={640}
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    priority={index === 0}
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                 </div>
               </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import type { AIInsight } from '@/types/database'
 
 interface InsightsPanelProps {
@@ -199,8 +200,8 @@ export function InsightsPanel({ onGenerateInsights }: InsightsPanelProps) {
 
       {/* Loading State */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+        <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-12 flex items-center justify-center">
+          <LoadingSpinner size="md" text="Loading insights..." />
         </div>
       )}
 

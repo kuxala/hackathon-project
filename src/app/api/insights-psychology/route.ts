@@ -287,8 +287,9 @@ function analyzeWorkHours(transactions: any[], summary: any): PsychologicalInsig
 
   Object.entries(summary.categoryTotals).forEach(([category, amount]) => {
     if (nonEssentialCategories.some(ne => category.includes(ne))) {
-      if (!topNonEssential || amount > topNonEssential[1]) {
-        topNonEssential = [category, amount as number]
+      const amountNum = amount as number
+      if (!topNonEssential || amountNum > topNonEssential[1]) {
+        topNonEssential = [category, amountNum]
       }
     }
   })

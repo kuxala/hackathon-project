@@ -71,8 +71,8 @@ export async function getUserTransactionSummary(userId: string, authToken: strin
     categoryBreakdown: Object.entries(byCategory)
       .map(([category, data]) => ({
         category,
-        total: data.total,
-        count: data.count
+        total: (data as any).total,
+        count: (data as any).count
       }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 5),
@@ -209,14 +209,14 @@ export async function getSpendingByCategory(
     return acc
   }, {})
 
-  const total = Object.values(byCategory).reduce((sum, amount) => sum + amount, 0)
+  const total = Object.values(byCategory).reduce((sum, amount) => (sum as number) + (amount as number), 0) as number
 
   return {
     categories: Object.entries(byCategory)
       .map(([category, amount]) => ({
         category,
-        amount,
-        percentage: total > 0 ? (amount / total) * 100 : 0
+        amount: amount as number,
+        percentage: total > 0 ? ((amount as number) / total) * 100 : 0
       }))
       .sort((a, b) => b.amount - a.amount),
     total

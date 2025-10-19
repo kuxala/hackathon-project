@@ -5,7 +5,7 @@ import { useVoiceRecognition } from '@/hooks/useVoiceRecognition'
 import { useTextToSpeech } from '@/hooks/useTextToSpeech'
 import { useVoiceShortcut } from '@/hooks/useVoiceShortcut'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import { VoiceModal } from './VoiceModal'
 import { VoiceModalContext } from '@/contexts/VoiceModalContext'
 
@@ -98,10 +98,6 @@ export function GlobalVoiceControl() {
         await new Promise(resolve => setTimeout(resolve, 500))
         result = mockProcessIntent(text)
       } else {
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
         const { data: { session } } = await supabase.auth.getSession()
 
         if (!session) {

@@ -5,15 +5,17 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Modal } from '@/components/shared/Modal'
 import { useInView } from '@/hooks/useInView'
-import { ChatWidget } from './components/ChatWidget'
+import dynamic from 'next/dynamic'
 import { DashboardHeader } from './components/DashboardHeader'
 import { SpendingIncomeChart } from './components/SpendingIncomeChart'
 import { LoanDebtChart } from './components/LoanDebtChart'
 import { MonthlySpendingChart } from './components/MonthlySpendingChart'
 import { BudgetForecastChart } from './components/BudgetForecastChart'
-import { FileUploadWidget } from '@/components/dashboard/FileUploadWidget'
-import { TransactionTable } from '@/components/dashboard/TransactionTable'
-import { InsightsPanel } from '@/components/dashboard/InsightsPanel'
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+
+// Lazy load heavy components
+const ChatWidget = dynamic(() => import('./components/ChatWidget').then(mod => ({ default: mod.ChatWidget })), { ssr: false })
+const FileUploadWidget = dynamic(() => import('@/components/dashboard/FileUploadWidget').then(mod => ({ default: mod.FileUploadWidget })), { ssr: false })
 import { supabase } from '@/lib/supabase'
 import type { ChartData } from '@/types/database'
 
@@ -205,97 +207,61 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
               </div>
             </div>
           )}
-          <motion.div
-            className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="flex-1">
-              <motion.h1
-                className="text-3xl font-bold tracking-tight text-gray-50"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1, duration: 0.5 }}
-              >
+              <h1 className="text-3xl font-bold tracking-tight text-gray-50">
                 Financial Overview
-              </motion.h1>
-              <motion.p
-                className="mt-1 text-base text-gray-400"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-              >
+              </h1>
+              <p className="mt-1 text-base text-gray-400">
                 Your financial health at a glance
-              </motion.p>
+              </p>
             </div>
             <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end">
-              <motion.button
+              <button
                 onClick={() => router.push('/dashboard/insights')}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-5 py-2.5 text-sm font-medium text-purple-300 transition-all shadow-lg shadow-purple-900/20 hover:border-purple-500/50 hover:bg-purple-500/20 md:w-auto"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.4 }}
-                whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(168, 85, 247, 0.4)' }}
-                whileTap={{ scale: 0.95 }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-5 py-2.5 text-sm font-medium text-purple-300 transition-all shadow-lg shadow-purple-900/20 hover:border-purple-500/50 hover:bg-purple-500/20 hover:scale-105 md:w-auto"
               >
-                <motion.svg
+                <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-5 w-5"
                   viewBox="0 0 20 20"
                   fill="currentColor"
-                  whileHover={{ scale: 1.1 }}
-                  transition={{ duration: 0.2 }}
                 >
                   <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-                </motion.svg>
+                </svg>
                 AI Insights
-              </motion.button>
-              <motion.button
+              </button>
+              <button
                 onClick={() => router.push('/dashboard/voice')}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-sm font-medium text-emerald-300 transition-all shadow-lg shadow-emerald-900/20 hover:border-emerald-500/50 hover:bg-emerald-500/20 md:w-auto"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.25, duration: 0.4 }}
-                whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(16, 185, 129, 0.4)' }}
-                whileTap={{ scale: 0.95 }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-sm font-medium text-emerald-300 transition-all shadow-lg shadow-emerald-900/20 hover:border-emerald-500/50 hover:bg-emerald-500/20 hover:scale-105 md:w-auto"
               >
-                <motion.svg
+                <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-5 w-5"
                   viewBox="0 0 24 24"
                   fill="currentColor"
-                  whileHover={{ scale: 1.1 }}
-                  transition={{ duration: 0.2 }}
                 >
                   <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
                   <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                </motion.svg>
+                </svg>
                 Voice Assistant
-              </motion.button>
-              <motion.button
+              </button>
+              <button
                 onClick={() => setIsImportModalOpen(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700 md:w-auto"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3, duration: 0.4 }}
-                whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(34, 197, 94, 0.4)' }}
-                whileTap={{ scale: 0.95 }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-green-700 hover:scale-105 md:w-auto"
               >
-                <motion.svg
+                <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-5 w-5"
                   viewBox="0 0 20 20"
                   fill="currentColor"
-                  whileHover={{ rotate: 180 }}
-                  transition={{ duration: 0.3 }}
                 >
                   <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                </motion.svg>
+                </svg>
                 Import
-              </motion.button>
+              </button>
             </div>
-          </motion.div>
+          </div>
           {/* Show empty state if no transactions */}
           {hasTransactions === false && !isLoadingCharts && (
             <motion.div
@@ -334,8 +300,8 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
           {/* Only show charts if user has transactions */}
           {hasTransactions !== false && (
           <>
-            {/* Sample Data Warning Banner */}
-            {!chartData && (
+            {/* Sample Data Warning Banner - Only show when not loading and no data */}
+            {!isLoadingCharts && !chartData && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -356,19 +322,10 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
             )}
 
             <div ref={chartsRef} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-                transition={{ delay: 0.1, duration: 0.6 }}
-                className="lg:col-span-3 relative"
-                whileHover={{ y: -2, transition: { duration: 0.2 } }}
-              >
+              <div className="lg:col-span-3 relative">
                 {isLoadingCharts ? (
-                  <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6">
-                    <div className="animate-pulse space-y-4">
-                      <div className="h-4 bg-gray-700 rounded w-1/4"></div>
-                      <div className="h-64 bg-gray-700 rounded"></div>
-                    </div>
+                  <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6 flex items-center justify-center min-h-[300px]">
+                    <LoadingSpinner size="md" text="Loading chart data..." />
                   </div>
                 ) : !chartData ? (
                   <div className="relative">
@@ -390,22 +347,13 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
                     data={chartData.monthlyTrend}
                   />
                 )}
-              </motion.div>
+              </div>
 
             {/* Show category breakdown OR monthly spending chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              transition={{ delay: 0.25, duration: 0.6 }}
-              className="lg:col-span-2 relative"
-              whileHover={{ y: -2, transition: { duration: 0.2 } }}
-            >
+            <div className="lg:col-span-2 relative">
               {isLoadingCharts ? (
-                <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6">
-                  <div className="animate-pulse space-y-4">
-                    <div className="h-4 bg-gray-700 rounded w-1/3"></div>
-                    <div className="h-64 bg-gray-700 rounded"></div>
-                  </div>
+                <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6 flex items-center justify-center min-h-[300px]">
+                  <LoadingSpinner size="md" text="Loading chart data..." />
                 </div>
               ) : chartData?.categoryBreakdown &&
                 chartData.categoryBreakdown.categories.length > 0 &&
@@ -437,21 +385,12 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
                   data={chartData.monthlyTrend}
                 />
               )}
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              transition={{ delay: 0.4, duration: 0.6 }}
-              className="lg:col-span-1 relative"
-              whileHover={{ y: -2, transition: { duration: 0.2 } }}
-            >
+            <div className="lg:col-span-1 relative">
               {isLoadingCharts ? (
-                <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6">
-                  <div className="animate-pulse space-y-4">
-                    <div className="h-4 bg-gray-700 rounded w-1/2"></div>
-                    <div className="h-64 bg-gray-700 rounded"></div>
-                  </div>
+                <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-6 flex items-center justify-center min-h-[300px]">
+                  <LoadingSpinner size="md" text="Loading chart data..." />
                 </div>
               ) : !chartData ? (
                 <div className="relative">
@@ -473,7 +412,7 @@ export default function DashboardExample({ user, onSignOut, loading }: Dashboard
                   data={chartData.budget}
                 />
               )}
-            </motion.div>
+            </div>
           </div>
           </>
           )}

@@ -13,27 +13,6 @@ export function SankeyDiagram({ data, isInView = true }: SankeyDiagramProps) {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
-  console.log('[SankeyDiagram] Received data:', data)
-  console.log('[SankeyDiagram] Nodes:', data?.nodes?.length)
-  console.log('[SankeyDiagram] Links:', data?.links?.length)
-
-  // Validation
-  if (!data || !data.nodes || !data.links || data.nodes.length === 0) {
-    console.log('[SankeyDiagram] Data validation failed!')
-    return (
-      <div className="rounded-xl border border-[rgb(30,30,30)] bg-gradient-to-br from-[rgb(15,15,15)] to-[rgb(18,18,18)] p-5 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-semibold text-gray-100 flex items-center gap-2">
-              <span className="text-purple-400">💸</span> Money Flow
-            </h3>
-            <p className="text-xs text-gray-500 mt-0.5">No data available</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   // Compact layout
   const width = 600
   const height = 350
@@ -41,6 +20,9 @@ export function SankeyDiagram({ data, isInView = true }: SankeyDiagramProps) {
   const padding = { top: 30, right: 30, bottom: 30, left: 30 }
 
   const layout = useMemo(() => {
+    if (!data || !data.nodes || !data.links || data.nodes.length === 0) {
+      return null
+    }
     const nodes = data.nodes
     const links = data.links
 
@@ -100,7 +82,7 @@ export function SankeyDiagram({ data, isInView = true }: SankeyDiagramProps) {
       })
 
     return { nodes: positioned, links: linkPaths }
-  }, [data, width, height])
+  }, [data, width, height, padding.top, padding.right, padding.bottom, padding.left, nodeWidth])
 
   const filteredLayout = useMemo(() => {
     if (!selectedCategory) return layout
@@ -122,6 +104,27 @@ export function SankeyDiagram({ data, isInView = true }: SankeyDiagramProps) {
       )
     }
   }, [layout, selectedCategory])
+
+  console.log('[SankeyDiagram] Received data:', data)
+  console.log('[SankeyDiagram] Nodes:', data?.nodes?.length)
+  console.log('[SankeyDiagram] Links:', data?.links?.length)
+
+  // Validation
+  if (!layout) {
+    console.log('[SankeyDiagram] Data validation failed!')
+    return (
+      <div className="rounded-xl border border-[rgb(30,30,30)] bg-gradient-to-br from-[rgb(15,15,15)] to-[rgb(18,18,18)] p-5 shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-100 flex items-center gap-2">
+              <span className="text-purple-400">💸</span> Money Flow
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">No data available</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-xl border border-[rgb(30,30,30)] bg-gradient-to-br from-[rgb(15,15,15)] to-[rgb(18,18,18)] p-5 shadow-xl">

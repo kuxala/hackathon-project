@@ -257,7 +257,7 @@ function generateBasicInsights(transactions: any[], summary: SpendingSummary): I
   return insights
 }
 
-async function generateAIInsights(transactions: any[], summary: SpendingSummary): Insight[] {
+async function generateAIInsights(transactions: any[], summary: SpendingSummary): Promise<Insight[]> {
   const insights: Insight[] = []
 
   try {

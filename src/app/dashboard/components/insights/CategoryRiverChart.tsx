@@ -10,27 +10,8 @@ interface CategoryRiverChartProps {
 }
 
 export function CategoryRiverChart({ data, isInView = true }: CategoryRiverChartProps) {
-  console.log('[CategoryRiverChart] Received data:', data)
-  console.log('[CategoryRiverChart] Layers:', data?.layers?.length)
-  console.log('[CategoryRiverChart] Periods:', data?.periods?.length)
-
-  // Validation
-  if (!data || !data.layers || data.layers.length === 0 || !data.periods || data.periods.length === 0) {
-    console.log('[CategoryRiverChart] Data validation failed!')
-    return (
-      <div className="rounded-xl border border-[rgb(30,30,30)] bg-gradient-to-br from-[rgb(15,15,15)] to-[rgb(18,18,18)] p-5 shadow-xl">
-        <div className="mb-4">
-          <h3 className="text-base font-semibold text-gray-100 flex items-center gap-2">
-            <span className="text-blue-400">🌊</span> Category Flow
-          </h3>
-          <p className="text-xs text-gray-500 mt-0.5">No data available</p>
-        </div>
-      </div>
-    )
-  }
-
   const [visibleCategories, setVisibleCategories] = useState<Set<string>>(
-    new Set(data.layers.slice(0, 6).map(l => l.category)) // Show top 6 by default
+    new Set(data?.layers?.slice(0, 6).map(l => l.category) || []) // Show top 6 by default
   )
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
@@ -39,6 +20,8 @@ export function CategoryRiverChart({ data, isInView = true }: CategoryRiverChart
   const padding = { top: 30, right: 30, bottom: 40, left: 30 }
 
   const streamData = useMemo(() => {
+    if (!data || !data.layers || !data.periods) return { layers: [], maxTotal: 0 }
+
     const filteredLayers = data.layers.filter(l => visibleCategories.has(l.category))
 
     if (filteredLayers.length === 0) return { layers: [], maxTotal: 0 }
@@ -125,7 +108,7 @@ export function CategoryRiverChart({ data, isInView = true }: CategoryRiverChart
     })
 
     return { layers, maxTotal }
-  }, [data, visibleCategories, width, height])
+  }, [data, visibleCategories, width, height, padding.top, padding.right, padding.bottom, padding.left])
 
   const toggleCategory = (category: string) => {
     setVisibleCategories(prev => {
@@ -137,6 +120,25 @@ export function CategoryRiverChart({ data, isInView = true }: CategoryRiverChart
       }
       return newSet
     })
+  }
+
+  console.log('[CategoryRiverChart] Received data:', data)
+  console.log('[CategoryRiverChart] Layers:', data?.layers?.length)
+  console.log('[CategoryRiverChart] Periods:', data?.periods?.length)
+
+  // Validation
+  if (!data || !data.layers || data.layers.length === 0 || !data.periods || data.periods.length === 0) {
+    console.log('[CategoryRiverChart] Data validation failed!')
+    return (
+      <div className="rounded-xl border border-[rgb(30,30,30)] bg-gradient-to-br from-[rgb(15,15,15)] to-[rgb(18,18,18)] p-5 shadow-xl">
+        <div className="mb-4">
+          <h3 className="text-base font-semibold text-gray-100 flex items-center gap-2">
+            <span className="text-blue-400">🌊</span> Category Flow
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">No data available</p>
+        </div>
+      </div>
+    )
   }
 
   return (

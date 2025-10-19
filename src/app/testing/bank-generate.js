@@ -1,7 +1,7 @@
 // npm install xlsx
 // Run: node generateRealisticBankStatement.js
 
-const XLSX = require("xlsx");
+import XLSX from "xlsx";
 
 function generateRealisticStatement(months = 3) {
   const incomeSources = [

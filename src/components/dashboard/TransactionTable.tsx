@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import type { Transaction } from '@/types/database'
 
 interface TransactionWithBank extends Transaction {
@@ -168,8 +169,15 @@ export function TransactionTable() {
         </div>
       )}
 
+      {/* Loading State */}
+      {loading && (
+        <div className="rounded-xl border border-[rgb(40,40,40)] bg-[rgb(18,18,18)] p-12 flex items-center justify-center">
+          <LoadingSpinner size="md" text="Loading transactions..." />
+        </div>
+      )}
+
       {/* Error State */}
-      {error && (
+      {!loading && error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
           <p className="text-sm text-red-400">{error}</p>
         </div>

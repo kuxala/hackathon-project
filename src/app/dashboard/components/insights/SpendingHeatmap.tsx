@@ -12,25 +12,10 @@ interface SpendingHeatmapProps {
 export function SpendingHeatmap({ data, isInView = true }: SpendingHeatmapProps) {
   const [hoveredDay, setHoveredDay] = useState<string | null>(null)
 
-  console.log('[SpendingHeatmap] Received data:', data)
-  console.log('[SpendingHeatmap] Days:', data?.days?.length)
-
-  // Validation
-  if (!data || !data.days || data.days.length === 0) {
-    console.log('[SpendingHeatmap] Data validation failed!')
-    return (
-      <div className="rounded-xl border border-[rgb(30,30,30)] bg-gradient-to-br from-[rgb(15,15,15)] to-[rgb(18,18,18)] p-5 shadow-xl">
-        <div className="mb-4">
-          <h3 className="text-base font-semibold text-gray-100 flex items-center gap-2">
-            <span className="text-green-400">📅</span> Spending Calendar
-          </h3>
-          <p className="text-xs text-gray-500 mt-0.5">No data available</p>
-        </div>
-      </div>
-    )
-  }
-
   const calendar = useMemo(() => {
+    if (!data || !data.days || data.days.length === 0) {
+      return null
+    }
     const weeks: any[][] = []
     let currentWeek: any[] = []
 
@@ -80,6 +65,24 @@ export function SpendingHeatmap({ data, isInView = true }: SpendingHeatmapProps)
     return weeks.slice(0, 26) // Last 6 months ~26 weeks
   }, [data])
 
+  console.log('[SpendingHeatmap] Received data:', data)
+  console.log('[SpendingHeatmap] Days:', data?.days?.length)
+
+  // Validation
+  if (!calendar) {
+    console.log('[SpendingHeatmap] Data validation failed!')
+    return (
+      <div className="rounded-xl border border-[rgb(30,30,30)] bg-gradient-to-br from-[rgb(15,15,15)] to-[rgb(18,18,18)] p-5 shadow-xl">
+        <div className="mb-4">
+          <h3 className="text-base font-semibold text-gray-100 flex items-center gap-2">
+            <span className="text-green-400">📅</span> Spending Calendar
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">No data available</p>
+        </div>
+      </div>
+    )
+  }
+
   const getColor = (intensity: number) => {
     if (intensity === 0) return 'rgb(25, 25, 25)'
     if (intensity < 20) return 'rgb(34, 197, 94)'
@@ -89,7 +92,7 @@ export function SpendingHeatmap({ data, isInView = true }: SpendingHeatmapProps)
     return 'rgb(239, 68, 68)'
   }
 
-  const hoveredDayData = data.days.find(d => d.date === hoveredDay)
+  const hoveredDayData = data?.days?.find(d => d.date === hoveredDay)
 
   return (
     <div className="rounded-xl border border-[rgb(30,30,30)] bg-gradient-to-br from-[rgb(15,15,15)] to-[rgb(18,18,18)] p-5 shadow-xl">
